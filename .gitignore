@@ -1,2 +1,9 @@
-bin/
-build/
+#ignore everything
+*
+
+# but not ignore
+!.gitignore
+!*src/
+!*pyscripts/
+!*input_files/
+
