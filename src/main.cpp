@@ -27,6 +27,7 @@ void run_operator(int argc, char** argv) {
   boost::property_tree::ini_parser::read_ini(std::string(argv[1]), pt);
 
   std::cout << pt.get<std::string>("Protocol.stages") << std::endl;
+  std::cout << pt.get<std::string>("Protocol.distance_strategy") << std::endl;
   init_rosetta();
   std::string prot_name = pt.get<std::string>("Protocol.prot");
   DE_Operator my_app(prot_name, pt);
