@@ -4,6 +4,8 @@
 # but not ignore
 !.gitignore
 !*src/
+!*src/PoseFiles/*
+!*src/PoseFiles/moves/*
 !*pyscripts/
 !*input_files/
 
