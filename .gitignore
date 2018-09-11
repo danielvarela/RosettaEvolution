@@ -5,8 +5,8 @@
 !.gitignore
 !*.cpp
 !*src/
-!*/src/PoseFiles/
-!*src/PoseFiles/moves/
+!src/PoseFiles/
+!src/PoseFiles/moves/
 !*pyscripts/
 !*input_files/
 
