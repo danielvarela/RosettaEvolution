@@ -4,6 +4,7 @@
 # but not ignore
 !.gitignore
 !*.cpp
+!*.hpp
 !*src/
 !src/PoseFiles/
 !src/PoseFiles/moves/
