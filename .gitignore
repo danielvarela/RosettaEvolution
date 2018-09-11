@@ -3,6 +3,7 @@
 
 # but not ignore
 !.gitignore
+!README.md
 !*.cpp
 !*.hpp
 !*src/
