@@ -52,7 +52,7 @@ public:
 
   MoverDE();
 
-  MoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, InitPopulationPtr init_popul_in);
+  MoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population);
 
   void print_timestamp();
 
@@ -80,7 +80,7 @@ public:
   virtual void select_parents(int i, Parents& parent);
 
 
-  void print_fitness_population(int gen_count);
+  virtual void print_fitness_population(int gen_count);
   virtual  void print_distances_population();
   void print_individual_information(int gen_count, bool new_best_found);
 
@@ -128,19 +128,32 @@ public:
   }
 };
 
+class RescaledSharedFitnessComparer {
+public:
+  RescaledSharedFitnessComparer() {}
+
+  bool operator() (SharedFitnessIndividual i, SharedFitnessIndividual j) {
+    return ( i.fit_shared < j.fit_shared );
+  }
+};
 
 class SharedMoverDE : public MoverDE
 {
 public:
   std::vector<double> shared_fitness, rmsd_to_native,   ind_inter_distance;
+  std::vector<Individual> copy_popul_fitness_for_print;
+  std::vector<double> copy_popul_shared_fitness_for_print;
   std::vector<int> neighs_per_ind;
-  RescaledFitnessComparer cmp;
+  RescaledSharedFitnessComparer cmp_shared_fitness;
 
   SharedMoverDE() : MoverDE() {}
 
-  SharedMoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, InitPopulationPtr init_popul_in) : MoverDE(pt, scfxn_in, init_popul_in) {}
+  SharedMoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population) : MoverDE(pt, scfxn_in, initial_population) {}
 
   bool select_population(const std::vector<Individual>& trial_popul);
+
+
+  void print_fitness_population(int gen_count);
 
   void print_distances_population();
 };
@@ -151,10 +164,11 @@ class HybridMoverDE : public MoverDE
 public:
   std::vector<double> shared_fitness, rmsd_to_native,   ind_inter_distance;
   std::vector<int> neighs_per_ind;
-  RescaledFitnessComparer cmp;
+  RescaledFitnessComparer cmp_score;
+  RescaledSharedFitnessComparer cmp_shared_fitness;
   boost::shared_ptr<LocalSearchIndividualMover> local_search;
 
-  HybridMoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, InitPopulationPtr init_popul_in,  boost::shared_ptr<LocalSearchIndividualMover> local_search_in) : MoverDE(pt, scfxn_in, init_popul_in) {
+  HybridMoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population,  boost::shared_ptr<LocalSearchIndividualMover> local_search_in) : MoverDE(pt, scfxn_in, initial_population) {
     local_search = local_search_in;
   }
 
@@ -169,10 +183,11 @@ class SharedHybridMoverDE : public SharedMoverDE
 public:
   std::vector<double> shared_fitness, rmsd_to_native,   ind_inter_distance;
   std::vector<int> neighs_per_ind;
-  RescaledFitnessComparer cmp;
+  RescaledFitnessComparer cmp_score;
+  RescaledSharedFitnessComparer cmp_shared_fitness;
   boost::shared_ptr<LocalSearchIndividualMover> local_search;
 
-  SharedHybridMoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, InitPopulationPtr init_popul_in,  boost::shared_ptr<LocalSearchIndividualMover> local_search_in) : SharedMoverDE(pt, scfxn_in, init_popul_in) {
+  SharedHybridMoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population,  boost::shared_ptr<LocalSearchIndividualMover> local_search_in) : SharedMoverDE(pt, scfxn_in, initial_population) {
     local_search = local_search_in;
   }
 
@@ -189,10 +204,9 @@ class CrowdingHybridMoverDE : public SharedHybridMoverDE
 public:
   std::vector<double> shared_fitness, rmsd_to_native,   ind_inter_distance;
   std::vector<int> neighs_per_ind;
-  RescaledFitnessComparer cmp;
   boost::shared_ptr<LocalSearchIndividualMover> local_search;
 
-  CrowdingHybridMoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, InitPopulationPtr init_popul_in,  boost::shared_ptr<LocalSearchIndividualMover> local_search_in) : SharedHybridMoverDE(pt, scfxn_in, init_popul_in, local_search_in) {
+  CrowdingHybridMoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population,  boost::shared_ptr<LocalSearchIndividualMover> local_search_in) : SharedHybridMoverDE(pt, scfxn_in, initial_population, local_search_in) {
     local_search = local_search_in;
   }
 

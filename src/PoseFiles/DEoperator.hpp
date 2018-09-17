@@ -69,7 +69,7 @@ public:
   std::map<std::string, Protinfo> prot_selection;
 
   enum distances_enum {
-    rmsd, euclidean, euclidean_loop
+    rmsd, euclidean, euclidean_loop, euclidean_diff_abs, euclidean_partial_mario, euclidean_mario, rmsd_without_superp
   };
   std::map<std::string, distances_enum> distances_map;
 
@@ -77,6 +77,11 @@ public:
     Shared, HybridShared
   };
   std::map<std::string, protocol_name_enum> protocol_name_map;
+
+  enum init_popul_strategy_enum{
+    total_random, total_random_pose_based, random_pose_based, init_popul_with_stage
+  };
+  std::map<std::string, init_popul_strategy_enum> init_popul_strategy_map;
 
   FragInsertionStrategy::FragOptions frag_opt;
   FragInsertionMoverPtr local_search_frag_mover;
@@ -96,13 +101,17 @@ public:
 
   void init_setup();
 
+  boost::shared_ptr<InitPopulation> initialize_init_popul_strategy();
+
   CalculateRmsdDistancePopulationPtr use_distances_strategy(std::string option);
 
   void init_files(Protinfo prot_info);
 
   boost::shared_ptr<MoverDE> prepare_stage(std::string stage_name);
 
-  void set_current_population( boost::shared_ptr<MoverDE> de );
+  void update_current_population_to_stage_score();
+
+  void initialize_population_stage1();
 
   boost::shared_ptr<MoverDE> init_differential_evolution_protocol();
 

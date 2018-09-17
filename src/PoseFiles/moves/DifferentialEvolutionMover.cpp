@@ -35,15 +35,14 @@ MoverDE::MoverDE() {
   best = 0;
   best_idx = 0;
 
-  init_popul(popul);
+  // init_popul(popul);
 }
 
-MoverDE::MoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, InitPopulationPtr init_popul_in) {
+MoverDE::MoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population) {
   srand(time(NULL));
   use_print_class = false;
   scfxn = scfxn_in;
-  init_popul_ = init_popul_in;
-
+  //  init_popul_ = init_popul_in;
 
   NP = pt.NP;
   Gmax = 10000;
@@ -56,7 +55,8 @@ MoverDE::MoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, InitPopulationPtr 
   best = 100000;
   best_idx = 0;
   last_gen_best = 0;
-  init_popul(popul);
+  //  init_popul(popul);
+  popul = initial_population;
   current_best_ind = popul[0];
   std::cout << "[CONF] ";
   std::cout << " NP " << NP ;
@@ -276,7 +276,6 @@ bool SharedMoverDE::select_population(const std::vector<Individual>& trial_popul
     sf_ind.index = i;
     double current_score = large_popul[i].score;
     if (current_score > 0) {
-      //sf_ind.fit_shared = (current_score + 0.50) *  shared_fitness[i] ;
       sf_ind.fit_shared = (current_score) *  shared_fitness[i] ;
     } else {
       sf_ind.fit_shared = (current_score) /  shared_fitness[i] ;
@@ -295,23 +294,30 @@ bool SharedMoverDE::select_population(const std::vector<Individual>& trial_popul
   new_best_found = (large_best_idx < NP);
   best = large_popul[large_best_idx].score;
 
-  std::sort(shared_popul.begin(), shared_popul.end(), cmp);
+  std::sort(shared_popul.begin(), shared_popul.end(), cmp_shared_fitness);
 
   bool best_already_included = false;
   avg_acc = 0;
-  for (int i = 0; i < NP; i++) {
+  copy_popul_fitness_for_print.resize(large_popul.size());
+  copy_popul_shared_fitness_for_print.resize(large_popul.size());
+  for (int i = 0; i < shared_popul.size(); i++) {
     int include_index = shared_popul[i].index;
-    if (include_index < NP) trial_sucess_n++;
-    popul[i] = large_popul[include_index];
-    //    popul[i].score = shared_popul[i].ind->score;
-    shared_fitness[i] = shared_popul[i].fit_shared;
-    avg_acc += popul[i].score;
-    rmsd_to_native[i] = shared_popul[i].rmsd;
-    neighs_per_ind[i] = shared_popul[i].neighs;
-    if (include_index == large_best_idx) {
-      best_already_included = true;
-      best_idx = i;
+    if (i < NP) {
+      if (include_index < NP) trial_sucess_n++;
+      popul[i] = large_popul[include_index];
+      //    popul[i].score = shared_popul[i].ind->score;
+      shared_fitness[i] = shared_popul[i].fit_shared;
+      avg_acc += popul[i].score;
+      rmsd_to_native[i] = shared_popul[i].rmsd;
+      if (include_index == large_best_idx) {
+	best_already_included = true;
+	best_idx = i;
+      }
     }
+
+    copy_popul_fitness_for_print[i] = large_popul[include_index];
+    copy_popul_shared_fitness_for_print[i] = shared_popul[i].fit_shared;
+    neighs_per_ind[i] = shared_popul[i].neighs;
   }
 
   if (!best_already_included) {
@@ -475,15 +481,33 @@ void MoverDE::print_fitness_population(int gen_count) {
   }
 }
 
+void SharedMoverDE::print_fitness_population(int gen_count) {
+  //if ((gen_count < 25) || (gen_count % 50 == 0)) {
+  if (true) {
+    std::cout << "[POP] ";
+    for (int i = 0; i < copy_popul_fitness_for_print.size(); i++) {
+      std::cout << (-1 * SCORE_ERROR_FIXED) + copy_popul_fitness_for_print[i].score << " ";
+    }
+    std::cout << std::endl;
+  }
+}
+
+
 void SharedMoverDE::print_distances_population() {
-  std::vector<double> ind_distance_avg = shared_fitness;
+  //std::vector<double> ind_distance_avg = shared_fitness;
+  std::vector<double> ind_distance_avg = copy_popul_shared_fitness_for_print;
+
+
   CalculateRmsdDistancePopulation::DistancesResult result =
                                         calculate_distances_popul->run(popul);
 
+  int large_NP = copy_popul_fitness_for_print.size();
+
+  //solo ocurre con CrowdingHybridMoverDE
   if (ind_distance_avg.size() < NP) {
-    //solo ocurre con CrowdingHybridMoverDE
-     ind_distance_avg = result.distances_of_population;
+    ind_distance_avg = result.distances_of_population;
   }
+
   std::vector<double> rmsd_native = result.rmsd_to_native;
   std::vector<double> ind_inter_distance = result.distances_of_population;
 
@@ -495,36 +519,43 @@ void SharedMoverDE::print_distances_population() {
     std::cout << std::endl;
   }
 
-    std::cout << "[DIST_POP] ";
-    std::cout << ind_distance_avg[best_idx]  + (-1 * SCORE_ERROR_FIXED) << " ";
-    for (int i = 0; i < NP; i++) {
-      std::cout << ind_distance_avg[i] + (-1 * SCORE_ERROR_FIXED) << " ";
-    }
-    std::cout << std::endl;
+  std::cout << "[DIST_POP] ";
+  std::cout << ind_distance_avg[best_idx]  + (-1 * SCORE_ERROR_FIXED) << " ";
+  for (int i = 0; i < large_NP; i++) {
+    std::cout << ind_distance_avg[i] + (-1 * SCORE_ERROR_FIXED) << " ";
+  }
+  std::cout << std::endl;
 
-    InterDistancesGraph inter_distances_calc;
+  InterDistancesGraph inter_distances_calc;
+  /* inter distances graphic */
+  double min_inter_distance = 1000, max_inter_distance = -1000;
+  for (int i = 0; i < ind_inter_distance.size(); i++) {
+    // if (min_inter_distance > ind_inter_distance[i]) {
+    //   min_inter_distance = ind_inter_distance[i];
+    // }
+    // if (max_inter_distance < ind_inter_distance[i]) {
+    //   max_inter_distance =ind_inter_distance[i];
+    // }
+    inter_distances_calc.add_occurrence(ind_inter_distance[i]);
+  }
+  //  std::cout << "min_inter_distance " << min_inter_distance << " max_inter_distance " << max_inter_distance << std::endl;
+  std::cout << "[INTER] ";
+  std::cout << inter_distances_calc.print_graph() << std::endl;
+  /* END inter distances graphic */
 
-    for (int i = 0; i < ind_inter_distance.size(); i++) {
-      inter_distances_calc.add_occurrence(ind_inter_distance[i]);
-    }
-
-    std::cout << "[INTER] ";
-    std::cout << inter_distances_calc.print_graph() << std::endl;
-
-    if (neighs_per_ind.size() > 0) {
+  if (neighs_per_ind.size() > 0) {
     std::cout << "[NEIGH] ";
-    for (int i = 0; i < NP; i++) {
+    for (int i = 0; i < large_NP; i++) {
       std::cout << neighs_per_ind[i] << " ";
     }
     std::cout << std::endl;
-    } else {
- std::cout << "[NEIGH] ";
+  } else {
+    std::cout << "[NEIGH] ";
     for (int i = 0; i < NP; i++) {
       std::cout << "1"<< " ";
     }
     std::cout << std::endl;
-    }
-
+  }
 }
 
 

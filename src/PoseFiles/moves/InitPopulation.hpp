@@ -34,6 +34,9 @@ public:
 	}
       }
 
+      ind.vars[0] = 0;
+      ind.vars[ind.vars.size() - 1] = 0;
+
       score(ind);
 
       popul.push_back(ind);
@@ -77,16 +80,19 @@ public:
 
   void apply(std::vector<Individual>& popul, int NP, int ind_size) {
     //    std::cout << "ind_size " <<  ind_size << std::endl;
+    popul.resize(0);
     for (int i = 0; i < NP; ++i) {
       Individual ind(ind_size);
       disturb_individual(ind, ind_size);
+      ind.vars[0] = 0;
+      ind.vars[ind.vars.size() - 1] = 0;
       score(ind);
       popul.push_back(ind);
     }
   }
 
 
-  void disturb_individual(Individual &ind, int ind_size) {
+  virtual void disturb_individual(Individual &ind, int ind_size) {
     int nres = scfxn->start_res();
     dist_degrees = 180;
     for (int j = 0; j < ind_size - 2; j = j+2) {
@@ -206,6 +212,47 @@ public:
 public:
   core::pose::PoseOP pose_;
 };
+class PoseTotalRandomInitPopulation : public PosePopulation
+{
+public:
+
+  PoseTotalRandomInitPopulation(FitFunctionPtr scfxn_ini , core::pose::PoseOP p, std::string ss_ ) : PosePopulation(scfxn_ini, p)  {
+  }
+
+
+  void disturb_individual(Individual &ind, int ind_size) {
+     for (int j = 0; j < ind_size; ++j) {
+	if (URAND() < 0.5) {
+	  ind.vars[j] = URAND();
+	} else {
+	  ind.vars[j] = URAND() * -1;
+	}
+      }
+
+      ind.vars[0] = 0;
+      ind.vars[ind.vars.size() - 1] = 0;
+      ind.omega.resize(0);
+      for (int i = 1; i <= pose_->total_residue(); i++) {
+	ind.omega.push_back(pose_->omega(i));
+      }
+      ind.ss = pose_->secstruct();
+      ind.score = 1000;
+  }
+  void apply(std::vector<Individual>& popul, int NP, int ind_size) {
+
+    boost::shared_ptr<PoseFragmentFunction> pfunc = boost::dynamic_pointer_cast<PoseFragmentFunction >(scfxn);
+    for (int i = 0; i < NP; ++i) {
+      Individual ind(ind_size);
+      disturb_individual(ind, ind_size);
+      pfunc->fill_pose(pose_, ind, ss);
+      pfunc->pose_to_ind(pose_, ind );
+      score(ind);
+      popul.push_back(ind);
+    }
+
+  }
+};
+
 class TwoStagesInitPopulation : public PosePopulation
 {
 public:
@@ -232,6 +279,8 @@ public:
       pfunc->fill_pose(pose_, ind, ss);
       two_stages_mover->apply(*pose_);
       pfunc->pose_to_ind(pose_, ind );
+      ind.vars[0] = 0;
+      ind.vars[ind.vars.size() - 1] = 0;
       score(ind);
       popul.push_back(ind);
     }

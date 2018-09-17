@@ -83,7 +83,7 @@ public:
 
   CalculateEuclideanDistancePopulation (const core::pose::PoseOP& p , FitFunctionPtr sfxn,  std::string ss_in, core::scoring::ScoreFunctionOP pscore, double radius) ;
 
-  void
+  virtual void
   apply_to_population(const std::vector<Individual>& popul, std::vector<double>& shared_fitness, std::vector<double>& rmsd_to_native,std::vector<double>& distances_of_population, std::vector<int>& neigh_per_ind  ) ;
 
   virtual  double euclidean_two_individuals(const Individual& ind_left, const Individual& ind_right) ;
@@ -108,6 +108,85 @@ public:
   double euclidean_two_individuals(const Individual& ind_left, const Individual& ind_right) ;
 
 };
+
+
+class CalculateEuclideanDiffAbsDistancePopulation : public CalculateEuclideanDistancePopulation
+{
+public:
+  CalculateEuclideanDiffAbsDistancePopulation() : CalculateEuclideanDistancePopulation() {
+  }
+
+  CalculateEuclideanDiffAbsDistancePopulation(FitFunctionPtr fitfunc);
+
+  CalculateEuclideanDiffAbsDistancePopulation (const core::pose::PoseOP& p , FitFunctionPtr sfxn,  std::string ss_in, core::scoring::ScoreFunctionOP pscore, double radius) ;
+
+  double euclidean_two_individuals(const Individual& ind_left, const Individual& ind_right) ;
+
+};
+
+
+
+class CalculateEuclideanMarioDistancePopulation : public CalculateEuclideanDistancePopulation
+{
+public:
+  std::vector<int> selected_residues_for_rmsd;
+
+  CalculateEuclideanMarioDistancePopulation() : CalculateEuclideanDistancePopulation() {
+  }
+
+  CalculateEuclideanMarioDistancePopulation(FitFunctionPtr fitfunc);
+
+  CalculateEuclideanMarioDistancePopulation (const core::pose::PoseOP& p , FitFunctionPtr sfxn,  std::string ss_in, core::scoring::ScoreFunctionOP pscore, double radius) ;
+
+  double euclidean_two_individuals(const Individual& ind_left, const Individual& ind_right) ;
+
+};
+class CalculateEuclideanMarioPartialDistancePopulation : public CalculateEuclideanDistancePopulation
+{
+public:
+  std::vector<int> selected_residues_for_rmsd;
+  std::vector<double> inter_distance_individual_1, inter_distance_individual_2;
+  std::vector<std::vector<double> > inter_distances_per_ind;
+  std::map<std::pair<int, int>, double > inter_dist_norm_max;
+  CalculateEuclideanMarioPartialDistancePopulation() : CalculateEuclideanDistancePopulation() {
+  }
+
+  CalculateEuclideanMarioPartialDistancePopulation(FitFunctionPtr fitfunc);
+
+  CalculateEuclideanMarioPartialDistancePopulation (const core::pose::PoseOP& p , FitFunctionPtr sfxn,  std::string ss_in, core::scoring::ScoreFunctionOP pscore, double radius) ;
+
+  void
+  apply_to_population(const std::vector<Individual>& popul, std::vector<double>& shared_fitness, std::vector<double>& rmsd_to_native,std::vector<double>& distances_of_population, std::vector<int>& neigh_per_ind  );
+
+  double
+distance_of_individual_partial_mario_euclidean(Individual pose_ind,const std::vector<Individual>& popul, double& shared_acc, int& neighs, std::vector<double>& ind_distances);
+
+  double euclidean_two_individuals(const Individual& ind_left, const Individual& ind_right) ;
+ void
+  build_inter_distances_of_straight();
+
+ void
+  build_inter_distances_of_population( const std::vector<Individual>& popul);
+
+};
+
+
+class CalculateEuclideanRmsdWithoutSuperpDistancePopulation : public CalculateEuclideanDistancePopulation
+{
+public:
+  CalculateEuclideanRmsdWithoutSuperpDistancePopulation() : CalculateEuclideanDistancePopulation() {
+  }
+
+  CalculateEuclideanRmsdWithoutSuperpDistancePopulation(FitFunctionPtr fitfunc);
+
+  CalculateEuclideanRmsdWithoutSuperpDistancePopulation (const core::pose::PoseOP& p , FitFunctionPtr sfxn,  std::string ss_in, core::scoring::ScoreFunctionOP pscore, double radius) ;
+
+  double euclidean_two_individuals(const Individual& ind_left, const Individual& ind_right) ;
+
+};
+
+
+
 
 
 typedef boost::shared_ptr<CalculateRmsdDistancePopulation> CalculateRmsdDistancePopulationPtr;

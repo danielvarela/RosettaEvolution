@@ -1,8 +1,10 @@
 
-#include "DEoperator.hpp"
 #include <map>
 #include <vector>
+#include <string>
 #include <stdlib.h>     /* exit, EXIT_FAILURE **/
+
+#include "DEoperator.hpp"
 
 DE_Operator::DE_Operator() {
   init_protein_archive();
@@ -22,9 +24,18 @@ DE_Operator::DE_Operator() {
   distances_map["rmsd"] = rmsd;
   distances_map["euclidean"] = euclidean;
   distances_map["euclidean_loop"] = euclidean_loop;
+  distances_map["euclidean_diff_abs"] = euclidean_diff_abs;
+  distances_map["euclidean_mario"] = euclidean_mario;
+  distances_map["euclidean_partial_mario"] = euclidean_partial_mario;
+  distances_map["rmsd_without_superp"] = rmsd_without_superp;
 
   protocol_name_map["Shared"] = Shared;
   protocol_name_map["HybridShared"] = HybridShared;
+
+  init_popul_strategy_map["total_random"] = total_random;
+  init_popul_strategy_map["random_pose_based"] = random_pose_based;
+  init_popul_strategy_map["total_random_pose_based"] = total_random_pose_based;
+  init_popul_strategy_map["init_popul_with_stage"] = init_popul_with_stage;
 }
 
 void
@@ -129,6 +140,22 @@ DE_Operator::use_distances_strategy(std::string option) {
     calculate_distances_popul = CalculateRmsdDistancePopulationPtr( new CalculateEuclideanLoopDistancePopulation(native_pose_, ffxn, ss, scorefxn, fit_radius));
     break;
   }
+  case euclidean_diff_abs: {
+    calculate_distances_popul = CalculateRmsdDistancePopulationPtr( new CalculateEuclideanDiffAbsDistancePopulation(native_pose_, ffxn, ss, scorefxn, fit_radius));
+    break;
+  }
+  case euclidean_partial_mario: {
+    calculate_distances_popul = CalculateRmsdDistancePopulationPtr( new CalculateEuclideanMarioPartialDistancePopulation(native_pose_, ffxn, ss, scorefxn, fit_radius));
+    break;
+  }
+  case euclidean_mario: {
+    calculate_distances_popul = CalculateRmsdDistancePopulationPtr( new CalculateEuclideanMarioDistancePopulation(native_pose_, ffxn, ss, scorefxn, fit_radius));
+    break;
+  }
+  case rmsd_without_superp: {
+    calculate_distances_popul = CalculateRmsdDistancePopulationPtr( new CalculateEuclideanRmsdWithoutSuperpDistancePopulation(native_pose_, ffxn, ss, scorefxn, fit_radius));
+    break;
+  }
   default:
     std::cout << "error with distances strategy" << std::endl;
     exit(1);
@@ -172,33 +199,64 @@ DE_Operator::prepare_stage(std::string stage_name) {
   //calculate_distances_popul = use_distances_strategy("rmsd");
   calculate_distances_popul = use_distances_strategy( app_options.get<std::string>("Protocol.distance_strategy") );
 
-  init_popul = boost::shared_ptr<InitPopulation>(new TwoStagesInitPopulation(ffxn, pose_, two_stages_mover, ss));
-  //    init_popul = boost::shared_ptr<InitPopulation>(new PosePopulation(ffxn, pose_, ss));
+  update_current_population_to_stage_score();
 
   boost::shared_ptr<MoverDE> de = init_differential_evolution_protocol();
-
   de->Gmax = gmax_per_stage[stage_name];
   de->use_print_class = true;
   de->print_best_ind = print_best;
   de->calculate_distances_popul = calculate_distances_popul;
 
-  set_current_population(de);
-
-  de->popul = current_population;
+  //  de->popul = current_population;
 
   return de;
+}
+
+boost::shared_ptr<InitPopulation>
+DE_Operator::initialize_init_popul_strategy() {
+  boost::shared_ptr<InitPopulation> init_popul_in_options_file;
+  std::string init_popul_option = app_options.get<std::string>("Protocol.init_strategy");
+
+  switch (init_popul_strategy_map[init_popul_option]) {
+  case total_random: {
+    init_popul_in_options_file = boost::shared_ptr<InitPopulation>(new InitPopulation(ffxn));
+    break;
+  }
+  case total_random_pose_based: {
+    init_popul_in_options_file = boost::shared_ptr<InitPopulation>(new PoseTotalRandomInitPopulation(ffxn, pose_, ss));
+    break;
+  }
+  case random_pose_based: {
+    init_popul_in_options_file = boost::shared_ptr<InitPopulation>(new PosePopulation(ffxn, pose_, ss));
+    break;
+  }
+  case init_popul_with_stage: {
+    init_popul_in_options_file = boost::shared_ptr<InitPopulation>(new TwoStagesInitPopulation(ffxn, pose_, two_stages_mover, ss));
+    break;
+  }
+  default:
+    std::cout << "problem selecting the init population strategy" << std::endl;
+    exit(1);
+    break;
+  }
+  return init_popul_in_options_file;
 }
 
 void
 DE_Operator::init_two_stages_mover() {
   core::scoring::ScoreFunctionOP score1 = core::scoring::ScoreFunctionFactory::create_score_function(std::string("score1").c_str());
+  frag_mover = FragInsertionStrategy::get(FragInsertionStrategy::FragMoverTypes::greedy_search, frag_opt);
+  ffxn = boost::shared_ptr<FitFunction>( new PoseFragmentFunction(pose_, score1, ss, frag_mover));
   two_stages_mover = boost::shared_ptr<InitStagesMover>( new InitStagesMover(score1, frag_set_, frag_set_large));
+  init_popul = initialize_init_popul_strategy();
 }
 
 void
-DE_Operator::set_current_population( boost::shared_ptr<MoverDE> de ) {
+DE_Operator::update_current_population_to_stage_score( ) {
   if (current_population.size() == 0) {
-    current_population = de->popul;
+    //    current_population = de->popul;
+    std::cout << "error, the current population was not initialize" << std::endl;
+    exit(1);
   } else {
     CalculateRmsdDistancePopulation::DistancesResult result =
       calculate_distances_popul->run(current_population);
@@ -208,7 +266,6 @@ DE_Operator::set_current_population( boost::shared_ptr<MoverDE> de ) {
       ffxn->score(current_population[i]);
     }
   }
-
 }
 
 boost::shared_ptr<MoverDE>
@@ -219,11 +276,11 @@ DE_Operator::init_differential_evolution_protocol() {
   boost::shared_ptr<MoverDE> de ;
   switch (protocol_name_map[protocol_name]) {
   case Shared: {
-    de = boost::shared_ptr<MoverDE>(new SharedMoverDE(conf, ffxn, init_popul));
+    de = boost::shared_ptr<MoverDE>(new SharedMoverDE(conf, ffxn, current_population));
     break;
   }
   case HybridShared: {
-    de = boost::shared_ptr<MoverDE>(new SharedHybridMoverDE(conf, ffxn, init_popul, local_search));
+    de = boost::shared_ptr<MoverDE>(new SharedHybridMoverDE(conf, ffxn, current_population, local_search));
     break;
   }
 default:
@@ -262,9 +319,20 @@ DE_Operator::get_native_pose() {
 }
 
 void
+DE_Operator::initialize_population_stage1() {
+  // current_population is modified using the stage1 of rosetta
+  std::cout << "=== init the current population ================ " << std::endl;
+  init_popul->apply(current_population, app_options.get<int>("DE.NP"), ffxn->D() );
+  std::cout << "=== finish initialization current population === " << std::endl;
+}
+
+void
 DE_Operator::run() {
   std::string stage_name;
   std::cout << "run " << std::endl;
+
+  initialize_population_stage1();
+
   if ( std::find(vec_stages.begin(), vec_stages.end(), "stage2") != vec_stages.end()) {
     stage_name = "stage2";
     std::cout << "================================================" << std::endl;
