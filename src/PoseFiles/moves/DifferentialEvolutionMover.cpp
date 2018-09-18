@@ -536,6 +536,7 @@ void SharedMoverDE::print_distances_population() {
     // if (max_inter_distance < ind_inter_distance[i]) {
     //   max_inter_distance =ind_inter_distance[i];
     // }
+    std::cout << ind_inter_distance[i] << std::endl;
     inter_distances_calc.add_occurrence(ind_inter_distance[i]);
   }
   //  std::cout << "min_inter_distance " << min_inter_distance << " max_inter_distance " << max_inter_distance << std::endl;

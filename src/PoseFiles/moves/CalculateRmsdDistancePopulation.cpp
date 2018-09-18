@@ -720,7 +720,7 @@ CalculateEuclideanMarioPartialDistancePopulation::build_inter_distances_of_popul
 	  inter_distance_individual_1.push_back(0);
 	} else {
 	  double normalized_dist = dist / inter_dist_norm_max[std::pair<int, int>(res_num_1, res_num_2)];
-	  std::cout << " dist " << dist << " norm " << normalized_dist << " max " << inter_dist_norm_max[std::pair<int, int>(res_num_1, res_num_2)] << std::endl;
+	  //	  std::cout << " dist " << dist << " norm " << normalized_dist << " max " << inter_dist_norm_max[std::pair<int, int>(res_num_1, res_num_2)] << std::endl;
 	  inter_distance_individual_1.push_back( normalized_dist );
 	}
       }
@@ -777,12 +777,12 @@ CalculateEuclideanMarioPartialDistancePopulation::euclidean_two_individuals(cons
 
   double result = std::sqrt(sum);
   result = result / inter_distance_individual_1.size();
-  std::cout << "partial_mario " << result << std::endl;
-  std::cout << "CA_rmsd " << rmsd << std::endl;
+  // std::cout << "partial_mario " << result << std::endl;
+  // std::cout << "CA_rmsd " << rmsd << std::endl;
 
-  std::cout << "end " << std::endl;
-  int p;
-  std::cin >> p;
+  // std::cout << "end " << std::endl;
+  // int p;
+  // std::cin >> p;
 
   return result;
 }
