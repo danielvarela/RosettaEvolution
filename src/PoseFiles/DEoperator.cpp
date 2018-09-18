@@ -186,8 +186,15 @@ DE_Operator::prepare_stage(std::string stage_name) {
   frag_opt.scorefxn = scorefxn;
   frag_opt.stage_name = stage_name;
 
+  bool fragment_at_trials = app_options.get<bool>("Protocol.frags_at_trials");
+  
   frag_mover = FragInsertionStrategy::get(FragInsertionStrategy::FragMoverTypes::greedy_search, frag_opt);
-  ffxn = boost::shared_ptr<FitFunction>( new PoseFragmentFunction(pose_, scorefxn, ss, frag_mover));
+  if (fragment_at_trials) {
+    ffxn = boost::shared_ptr<FitFunction>( new PoseFragmentFunction(pose_, scorefxn, ss, frag_mover));
+  } else {
+    ffxn = boost::shared_ptr<FitFunction>( new PoseScoreFunction(pose_, scorefxn, ss, frag_mover));
+  }
+ 
   //ffxn = boost::shared_ptr<FitFunction>( new PoseToyFunction(pose_, scorefxn, ss, frag_mover));
   local_search_frag_mover = FragInsertionStrategy::get(FragInsertionStrategy::FragMoverTypes::stage3mover, frag_opt);
   local_search = boost::shared_ptr<LocalSearchIndividualMover>(
@@ -246,7 +253,7 @@ void
 DE_Operator::init_two_stages_mover() {
   core::scoring::ScoreFunctionOP score1 = core::scoring::ScoreFunctionFactory::create_score_function(std::string("score1").c_str());
   frag_mover = FragInsertionStrategy::get(FragInsertionStrategy::FragMoverTypes::greedy_search, frag_opt);
-  ffxn = boost::shared_ptr<FitFunction>( new PoseFragmentFunction(pose_, score1, ss, frag_mover));
+  ffxn = boost::shared_ptr<FitFunction>( new PoseScoreFunction(pose_, score1, ss, frag_mover));
   two_stages_mover = boost::shared_ptr<InitStagesMover>( new InitStagesMover(score1, frag_set_, frag_set_large));
   init_popul = initialize_init_popul_strategy();
 }

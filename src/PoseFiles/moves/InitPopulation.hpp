@@ -272,7 +272,7 @@ public:
 
   void apply(std::vector<Individual>& popul, int NP, int ind_size) {
 
-    boost::shared_ptr<PoseFragmentFunction> pfunc = boost::dynamic_pointer_cast<PoseFragmentFunction >(scorefxn);
+    boost::shared_ptr<PoseScoreFunction> pfunc = boost::dynamic_pointer_cast<PoseScoreFunction >(scorefxn);
     for (int i = 0; i < NP; ++i) {
       Individual ind(ind_size);
       disturb_individual(ind, ind_size);
