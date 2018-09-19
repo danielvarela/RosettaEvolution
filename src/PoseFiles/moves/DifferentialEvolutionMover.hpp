@@ -33,8 +33,9 @@ public:
   int NP;
   double CR, F;
   double fit_rad;
+  std::string prot;
 
-  ConfigurationDE(int n, double c, double f, double rad) : NP(n), CR(c), F(f), fit_rad(rad) {
+  ConfigurationDE(int n, double c, double f, double rad, std::string p) : NP(n), CR(c), F(f), fit_rad(rad), prot(p) {
   }
 };
 
@@ -95,10 +96,12 @@ public:
   int D;
   double CR, F;
 
+  double fit_rad;
   double avg_acc, best;
   int best_idx;
   int last_gen_best;
   double diff_avg_bef, diff_avg_aft;
+  std::string prot;
 
   FitFunctionPtr scfxn;
   InitPopulationPtr init_popul_;

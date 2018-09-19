@@ -38,6 +38,13 @@ void run_operator(int argc, char** argv) {
   my_app.run();
 }
 
+#include "./helper_apps/FileToPDBPrinter.hpp"
+
+void codified_angles_to_pdb(int argc, char** argv) {
+  init_rosetta();
+  FileToPDBPrinter::print(argv[1]);
+}
+
 void run_score(int argc, char** argv) {
  //  devel::init(argc, argv);
   init_rosetta();
@@ -63,7 +70,8 @@ int main(int argc, char *argv[]) {
   std::cout << "init " << std::endl;
   srand ( time(NULL) );
 
-  //  init_rosetta();
+  //  codified_angles_to_pdb(argc, argv);
+
   if (score) {
     run_score(argc, argv);
   } else {

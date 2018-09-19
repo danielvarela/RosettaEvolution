@@ -16,6 +16,7 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/date_time/local_time_adjustor.hpp>
 #include <boost/date_time/c_local_time_adjustor.hpp>
+#include "../../helper_apps/FileToPDBPrinter.hpp"
 
 MoverDE::MoverDE() {
   srand(time(NULL));
@@ -50,11 +51,13 @@ MoverDE::MoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, std::vector<Indivi
 
   CR = pt.CR;
   F = pt.F;
+  prot = pt.prot;
 
   avg_acc = 1;
   best = 100000;
   best_idx = 0;
   last_gen_best = 0;
+  fit_rad = pt.fit_rad;
   //  init_popul(popul);
   popul = initial_population;
   current_best_ind = popul[0];
@@ -363,6 +366,9 @@ void MoverDE::print_generation_information(int gen_count, bool new_best_found) {
       print_individual_information(gen_count, new_best_found);
 
       std::cout << "[TRIAL_SUC] " << trial_sucess_n << std::endl;
+      if ((gen_count == 1) || (gen_count == 9) || (gen_count == 50) || (gen_count == 199)) {
+	FileToPDBPrinter::population_to_file(NP, D, scfxn->name(), fit_rad, prot, gen_count, popul);
+      }
     }
   }
 }
@@ -536,7 +542,7 @@ void SharedMoverDE::print_distances_population() {
     // if (max_inter_distance < ind_inter_distance[i]) {
     //   max_inter_distance =ind_inter_distance[i];
     // }
-    std::cout << ind_inter_distance[i] << std::endl;
+    //    std::cout << ind_inter_distance[i] << std::endl;
     inter_distances_calc.add_occurrence(ind_inter_distance[i]);
   }
   //  std::cout << "min_inter_distance " << min_inter_distance << " max_inter_distance " << max_inter_distance << std::endl;

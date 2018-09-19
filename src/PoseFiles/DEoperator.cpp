@@ -54,6 +54,7 @@ DE_Operator::DE_Operator(std::string prot_selected, boost::property_tree::ptree 
   fit_radius = app_options.get<double>("Extra.fitrad");
   init_files(prot_selection[prot_selected]);
   init_setup();
+  init_two_stages_mover();
   init_available_stages();
 }
 
@@ -115,13 +116,11 @@ DE_Operator::init_setup() {
   pose_ = core::pose::PoseOP(new core::pose::Pose(ipose));
   best_pose_ = pose_->clone();
   native_pose_ = pose_->clone();
-  scorefxn = core::scoring::ScoreFunctionFactory::create_score_function(std::string("score1").c_str());
+  scorefxn = core::scoring::ScoreFunctionFactory::create_score_function(std::string("score3").c_str());
   std::cout << "start score: " << (*scorefxn)(*pose_) << std::endl;
   de_len = 10;
   start_res = 2;
   best_score = 1000000;
-  init_two_stages_mover();
-
   // COMPLETE ABINITIO MOVER AT THE BOTTOM OF THE FILE
 }
 
@@ -220,9 +219,8 @@ DE_Operator::prepare_stage(std::string stage_name) {
 }
 
 boost::shared_ptr<InitPopulation>
-DE_Operator::initialize_init_popul_strategy() {
+DE_Operator::initialize_init_popul_strategy(std::string init_popul_option) {
   boost::shared_ptr<InitPopulation> init_popul_in_options_file;
-  std::string init_popul_option = app_options.get<std::string>("Protocol.init_strategy");
 
   switch (init_popul_strategy_map[init_popul_option]) {
   case total_random: {
@@ -255,7 +253,7 @@ DE_Operator::init_two_stages_mover() {
   frag_mover = FragInsertionStrategy::get(FragInsertionStrategy::FragMoverTypes::greedy_search, frag_opt);
   ffxn = boost::shared_ptr<FitFunction>( new PoseScoreFunction(pose_, score1, ss, frag_mover));
   two_stages_mover = boost::shared_ptr<InitStagesMover>( new InitStagesMover(score1, frag_set_, frag_set_large));
-  init_popul = initialize_init_popul_strategy();
+    init_popul = initialize_init_popul_strategy(app_options.get<std::string>("Protocol.init_strategy") );
 }
 
 void
@@ -278,8 +276,10 @@ DE_Operator::update_current_population_to_stage_score( ) {
 boost::shared_ptr<MoverDE>
 DE_Operator::init_differential_evolution_protocol() {
   //     boost::shared_ptr<MoverDE> de = boost::shared_ptr<MoverDE>(new SharedMoverDE(ffxn, init_popul));
-  ConfigurationDE conf = ConfigurationDE(app_options.get<int>("DE.NP"), app_options.get<double>("DE.CR"), app_options.get<double>("DE.F"), app_options.get<double>("Extra.fitrad") );
+  ConfigurationDE conf = ConfigurationDE(app_options.get<int>("DE.NP"), app_options.get<double>("DE.CR"), app_options.get<double>("DE.F"), app_options.get<double>("Extra.fitrad") , app_options.get<std::string>("Protocol.prot"));
+
   std::string protocol_name = app_options.get<std::string>("Protocol.name");
+
   boost::shared_ptr<MoverDE> de ;
   switch (protocol_name_map[protocol_name]) {
   case Shared: {

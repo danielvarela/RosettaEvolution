@@ -101,7 +101,7 @@ public:
 
   void init_setup();
 
-  boost::shared_ptr<InitPopulation> initialize_init_popul_strategy();
+  boost::shared_ptr<InitPopulation> initialize_init_popul_strategy(std::string init_popul_option );
 
   CalculateRmsdDistancePopulationPtr use_distances_strategy(std::string option);
 

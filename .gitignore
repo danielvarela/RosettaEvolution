@@ -9,6 +9,7 @@
 !*src/
 !src/PoseFiles/
 !src/PoseFiles/moves/
+!src/helper_apps/
 !*pyscripts/
 !*input_files/
 
