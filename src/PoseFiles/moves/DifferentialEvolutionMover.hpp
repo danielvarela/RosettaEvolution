@@ -214,6 +214,19 @@ public:
 
 };
 
+class CrowdingMoverDE : public SharedMoverDE
+{
+public:
+  CrowdingMoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population) : SharedMoverDE(pt, scfxn_in, initial_population) {}
+  CrowdingMoverDE(boost::property_tree::ptree options, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population) : SharedMoverDE(options, scfxn_in, initial_population) {}
+
+  bool select_population(const std::vector<Individual>& trial_popul);
+
+
+  void select_parents(int i, Parents& parent);
+};
+
+
 class CrowdingHybridMoverDE : public SharedHybridMoverDE
 {
 public:

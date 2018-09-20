@@ -32,6 +32,7 @@ DE_Operator::DE_Operator() {
 
   protocol_name_map["Shared"] = Shared;
   protocol_name_map["HybridShared"] = HybridShared;
+  protocol_name_map["CrowdingDE"] = CrowdingDE;
 
   init_popul_strategy_map["total_random"] = total_random;
   init_popul_strategy_map["random_pose_based"] = random_pose_based;
@@ -306,6 +307,10 @@ DE_Operator::init_differential_evolution_protocol() {
   }
   case HybridShared: {
     de = boost::shared_ptr<MoverDE>(new SharedHybridMoverDE(app_options, ffxn, current_population, local_search));
+    break;
+  }
+  case CrowdingDE: {
+    de = boost::shared_ptr<MoverDE>(new CrowdingMoverDE(app_options, ffxn, current_population));
     break;
   }
 default:

@@ -293,6 +293,38 @@ bool CrowdingHybridMoverDE::select_population(const std::vector<Individual>& tri
   return new_best_found;
 }
 
+
+bool CrowdingMoverDE::select_population(const std::vector<Individual>& trial_popul) {
+  trial_sucess_n = 0;
+  // Crowding DE: Rene Thomsen Algorithm
+  // 1. Each trial can be replace only its nearest individual if the energy is better
+
+  bool new_best_found = false;
+  double previous_best = popul[best_idx].score;
+  for (int i = 0; i < trial_popul.size(); i++) {
+    int nearest_ind = calculate_distances_popul->find_nearest(trial_popul[i], popul);
+    if ( trial_popul[i].score < popul[nearest_ind].score ) {
+      popul[nearest_ind] = trial_popul[i];
+      new_best_found = true;
+      trial_sucess_n++;
+    }
+  }
+
+  avg_acc = 0;
+  for (int i = 0; i < popul.size(); i++) {
+    avg_acc += popul[i].score;
+    if (popul[i].score < popul[best_idx].score) {
+      best_idx = i;
+      best = popul[best_idx].score;
+      if (best < previous_best) {
+	new_best_found = true;
+      }
+    }
+  }
+
+  return new_best_found;
+}
+
 bool SharedMoverDE::select_population(const std::vector<Individual>& trial_popul) {
   bool new_best_found = false;
   trial_sucess_n = 0;
@@ -502,6 +534,20 @@ void MoverDE::select_parents(int i, Parents& parent) {
 }
 
 
+void CrowdingMoverDE::select_parents(int i, Parents& parent) {
+  do {
+    parent.x1 = rand() % NP;
+  } while (parent.x1 == i);
+  do {
+    parent.x2 = rand() % NP;
+  } while ((parent.x2 ==i) || (parent.x2 == parent.x1));
+
+  do {
+    parent.x3 = rand() % NP;
+  } while ((parent.x3 == i) || (parent.x3 == parent.x2) || (parent.x3 == parent.x1));
+}
+
+
 void CrowdingHybridMoverDE::select_parents(int i, Parents& parent) {
 
   // std::vector<int> nearest_inds = calculate_distances_popul->find_nearest_parent(i, popul[i], popul);
@@ -602,6 +648,7 @@ void SharedMoverDE::print_distances_population() {
 
   if (neighs_per_ind.size() > 0) {
     std::cout << "[NEIGH] ";
+
     for (int i = 0; i < large_NP; i++) {
       std::cout << neighs_per_ind[i] << " ";
     }
@@ -609,7 +656,7 @@ void SharedMoverDE::print_distances_population() {
   } else {
     std::cout << "[NEIGH] ";
     for (int i = 0; i < NP; i++) {
-      std::cout << "1"<< " ";
+      std::cout << result.neigh_per_ind[i] << " ";
     }
     std::cout << std::endl;
   }

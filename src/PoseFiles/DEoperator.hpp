@@ -74,7 +74,7 @@ public:
   std::map<std::string, distances_enum> distances_map;
 
   enum protocol_name_enum{
-    Shared, HybridShared
+    Shared, HybridShared, CrowdingDE
   };
   std::map<std::string, protocol_name_enum> protocol_name_map;
 
