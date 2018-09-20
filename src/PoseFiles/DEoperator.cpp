@@ -22,6 +22,7 @@ DE_Operator::DE_Operator() {
   gmax_per_stage["stage4"] = 100000;
 
   distances_map["rmsd"] = rmsd;
+  distances_map["rmsd_native_diff"] = rmsd_native_diff;
   distances_map["euclidean"] = euclidean;
   distances_map["euclidean_loop"] = euclidean_loop;
   distances_map["euclidean_diff_abs"] = euclidean_diff_abs;
@@ -131,6 +132,10 @@ DE_Operator::use_distances_strategy(std::string option) {
   switch (distances_map[option]) {
   case rmsd: {
     calculate_distances_popul = CalculateRmsdDistancePopulationPtr( new CalculateRmsdDistancePopulation(native_pose_, ffxn, ss, scorefxn, fit_radius));
+    break;
+  }
+  case rmsd_native_diff: {
+    calculate_distances_popul = CalculateRmsdDistancePopulationPtr( new CalculateNativeDiffDistancePopulation(native_pose_, ffxn, ss, scorefxn, fit_radius));
     break;
   }
   case euclidean: {

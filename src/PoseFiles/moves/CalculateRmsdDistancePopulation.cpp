@@ -188,12 +188,63 @@ CalculateRmsdDistancePopulation::apply_to_population(const std::vector<Individua
   distances_of_population = ind_distances;
 }
 
+
+CalculateNativeDiffDistancePopulation::CalculateNativeDiffDistancePopulation (const core::pose::PoseOP& p , FitFunctionPtr sfxn,  std::string ss_in, core::scoring::ScoreFunctionOP pscore, double radius)  : CalculateRmsdDistancePopulation(p, sfxn, ss_in, pscore, radius) {
+}
+
+
+double
+CalculateNativeDiffDistancePopulation::rmsd_between_inds(Individual ind_left, Individual ind_right) {
+  core::pose::PoseOP pose_ind_right = pose_ind->clone();
+  pfunc->fill_pose(pose_ind, ind_left, ss);
+  pfunc->fill_pose(pose_ind_right, ind_right, ss);
+  double right_native =  core::scoring::CA_rmsd(*native_, *pose_ind_right);
+  double left_native =  core::scoring::CA_rmsd(*native_, *pose_ind);
+  std::cout << "native_diff_abs " << std::abs(right_native - left_native) << std::endl;
+  return std::abs(right_native - left_native);
+}
+
 double  CalculateRmsdDistancePopulation::rmsd_between_inds(Individual ind_left, Individual ind_right) {
   core::pose::PoseOP pose_ind_right = pose_ind->clone();
   pfunc->fill_pose(pose_ind, ind_left, ss);
   pfunc->fill_pose(pose_ind_right, ind_right, ss);
   return core::scoring::CA_rmsd(*pose_ind, *pose_ind_right);
 }
+
+double  CalculateNativeDiffDistancePopulation::distance_of_individual(core::pose::PoseOP pose_ind,const std::vector<Individual>& popul, double& shared_acc, int& neighs, std::vector<double>& ind_distances) {
+  double rmsd = 0.0, ind_rmsd = 0.0, sh_aux = 0.0;
+  int popul_size = popul.size();
+  int neigh = 0;
+
+  for (int j = 0; j < popul_size; j++) {
+    pfunc->fill_pose(pose_other, popul[j], ss);
+    ind_rmsd = core::scoring::CA_rmsd(*pose_other, *pose_ind);
+    double right_native =  core::scoring::CA_rmsd(*native_, *pose_ind);
+    double left_native =  core::scoring::CA_rmsd(*native_, *pose_other);
+
+    ind_rmsd = std::abs(right_native - left_native);
+
+    ind_distances.push_back(ind_rmsd);
+    if (ind_rmsd < fit_radius) {
+      sh_aux += (1 - pow( (ind_rmsd / fit_radius) , 2 ));
+      neigh++;
+    }
+    rmsd += ind_rmsd;
+  }
+
+  if (rmsd > 0) {
+    rmsd = rmsd / popul_size;
+  } else {
+    rmsd = 0.0;
+  }
+
+
+  shared_acc = sh_aux;
+  neighs = neigh;
+
+  return rmsd;
+}
+
 
 double  CalculateRmsdDistancePopulation::distance_of_individual(core::pose::PoseOP pose_ind,const std::vector<Individual>& popul, double& shared_acc, int& neighs, std::vector<double>& ind_distances) {
   double rmsd = 0.0, ind_rmsd = 0.0, sh_aux = 0.0;

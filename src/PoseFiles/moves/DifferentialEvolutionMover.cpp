@@ -279,8 +279,6 @@ bool CrowdingHybridMoverDE::select_population(const std::vector<Individual>& tri
   }
 
   avg_acc = 0;
-
-
   for (int i = 0; i < popul.size(); i++) {
     avg_acc += popul[i].score;
     if (popul[i].score < popul[best_idx].score) {
@@ -506,24 +504,24 @@ void MoverDE::select_parents(int i, Parents& parent) {
 
 void CrowdingHybridMoverDE::select_parents(int i, Parents& parent) {
 
-  std::vector<int> nearest_inds = calculate_distances_popul->find_nearest_parent(i, popul[i], popul);
+  // std::vector<int> nearest_inds = calculate_distances_popul->find_nearest_parent(i, popul[i], popul);
 
-  // do {
-  //   parent.x1 = rand() % NP;
-  // } while (parent.x1 == i);
+  do {
+    parent.x1 = rand() % NP;
+  } while (parent.x1 == i);
 
   // parent.x1 = best_idx;
-  parent.x1 = nearest_inds[0];
-  parent.x1 = nearest_inds[1];
-  parent.x1 = nearest_inds[2];
+  // parent.x1 = nearest_inds[0];
+  // parent.x1 = nearest_inds[1];
+  // parent.x1 = nearest_inds[2];
 
-  // do {
-  //   parent.x2 = rand() % NP;
-  // } while ((parent.x2 ==i) || (parent.x2 == parent.x1));
+  do {
+    parent.x2 = rand() % NP;
+  } while ((parent.x2 ==i) || (parent.x2 == parent.x1));
 
-  // do {
-  //   parent.x3 = rand() % NP;
-  // } while ((parent.x3 == i) || (parent.x3 == parent.x2) || (parent.x3 == parent.x1));
+  do {
+    parent.x3 = rand() % NP;
+  } while ((parent.x3 == i) || (parent.x3 == parent.x2) || (parent.x3 == parent.x1));
 }
 
 

@@ -69,7 +69,7 @@ public:
   std::map<std::string, Protinfo> prot_selection;
 
   enum distances_enum {
-    rmsd, euclidean, euclidean_loop, euclidean_diff_abs, euclidean_partial_mario, euclidean_mario, rmsd_without_superp
+    rmsd, rmsd_native_diff, euclidean, euclidean_loop, euclidean_diff_abs, euclidean_partial_mario, euclidean_mario, rmsd_without_superp
   };
   std::map<std::string, distances_enum> distances_map;
 

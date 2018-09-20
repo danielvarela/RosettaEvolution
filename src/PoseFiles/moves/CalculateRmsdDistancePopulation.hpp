@@ -68,10 +68,24 @@ public:
 
   virtual double rmsd_between_inds(Individual ind_left, Individual ind_right) ;
 
-  double distance_of_individual(core::pose::PoseOP pose_ind,const std::vector<Individual>& popul, double& shared_acc, int& neighs, std::vector<double>& ind_distances) ;
+  virtual double distance_of_individual(core::pose::PoseOP pose_ind,const std::vector<Individual>& popul, double& shared_acc, int& neighs, std::vector<double>& ind_distances) ;
 
   void print_distance_population( const std::vector<Individual>& popul ) ;
 };
+class CalculateNativeDiffDistancePopulation : public CalculateRmsdDistancePopulation
+{
+public:
+
+  CalculateNativeDiffDistancePopulation() : CalculateRmsdDistancePopulation() {
+  }
+
+  CalculateNativeDiffDistancePopulation (const core::pose::PoseOP& p , FitFunctionPtr sfxn,  std::string ss_in, core::scoring::ScoreFunctionOP pscore, double radius) ;
+
+  double distance_of_individual(core::pose::PoseOP pose_ind,const std::vector<Individual>& popul, double& shared_acc, int& neighs, std::vector<double>& ind_distances);
+
+  double rmsd_between_inds(Individual ind_left, Individual ind_right) ;
+};
+
 
 class CalculateEuclideanDistancePopulation : public CalculateRmsdDistancePopulation
 {
