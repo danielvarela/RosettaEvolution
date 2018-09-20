@@ -61,6 +61,8 @@ DE_Operator::DE_Operator(std::string prot_selected, boost::property_tree::ptree 
 DE_Operator::DE_Operator(std::string prot_selected) : DE_Operator() {
   init_files(prot_selection[prot_selected]);
   init_setup();
+  init_default_score();
+  init_popul = initialize_init_popul_strategy(std::string("total_random_pose_based"));
 }
 
 
@@ -248,8 +250,19 @@ DE_Operator::initialize_init_popul_strategy(std::string init_popul_option) {
 }
 
 void
+DE_Operator::init_default_score() {
+  core::scoring::ScoreFunctionOP score3 = core::scoring::ScoreFunctionFactory::create_score_function(std::string("score3").c_str());
+  frag_opt.scorefxn = score3;
+  frag_opt.stage_name = "stage4";
+  frag_mover = FragInsertionStrategy::get(FragInsertionStrategy::FragMoverTypes::greedy_search, frag_opt);
+  ffxn = boost::shared_ptr<FitFunction>( new PoseScoreFunction(pose_, score3, ss, frag_mover)); 
+}
+
+void
 DE_Operator::init_two_stages_mover() {
   core::scoring::ScoreFunctionOP score1 = core::scoring::ScoreFunctionFactory::create_score_function(std::string("score1").c_str());
+  frag_opt.scorefxn = score1;
+  frag_opt.stage_name = "stage1";
   frag_mover = FragInsertionStrategy::get(FragInsertionStrategy::FragMoverTypes::greedy_search, frag_opt);
   ffxn = boost::shared_ptr<FitFunction>( new PoseScoreFunction(pose_, score1, ss, frag_mover));
   two_stages_mover = boost::shared_ptr<InitStagesMover>( new InitStagesMover(score1, frag_set_, frag_set_large));
@@ -283,11 +296,11 @@ DE_Operator::init_differential_evolution_protocol() {
   boost::shared_ptr<MoverDE> de ;
   switch (protocol_name_map[protocol_name]) {
   case Shared: {
-    de = boost::shared_ptr<MoverDE>(new SharedMoverDE(conf, ffxn, current_population));
+    de = boost::shared_ptr<MoverDE>(new SharedMoverDE(app_options, ffxn, current_population));
     break;
   }
   case HybridShared: {
-    de = boost::shared_ptr<MoverDE>(new SharedHybridMoverDE(conf, ffxn, current_population, local_search));
+    de = boost::shared_ptr<MoverDE>(new SharedHybridMoverDE(app_options, ffxn, current_population, local_search));
     break;
   }
 default:

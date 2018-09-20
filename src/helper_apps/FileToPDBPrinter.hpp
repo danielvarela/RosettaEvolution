@@ -8,6 +8,7 @@
 #include <map>
 #include <iterator>
 #include <boost/tokenizer.hpp>
+#include <boost/property_tree/ptree.hpp>
 
 #include "../PoseFiles/moves/DE_types.hpp"
 #include "../PoseFiles/DEoperator.hpp"
@@ -22,9 +23,24 @@ public:
 
   }
 
-  static void population_to_file( int NP, int D, std::string score_name, double fit_rad, const std::string & prot, int gen, const std::vector<Individual>& popul) {
-    std::ofstream ofs ( string("./temp_4/population"+score_name+"_"+ to_string(gen) +".log") , std::ofstream::out);
-    ofs << "[CONF] " << "NP " << NP << " D " << D << " score " << score_name << " fit_rad "<<  fit_rad << " prot " << prot << " gen " << gen << std::endl;
+  static void population_to_file(boost::property_tree::ptree pt, std::string score_name, int gen, const std::vector<Individual>& popul) {
+    int NP = pt.get<int>("DE.NP");
+    int D = popul[0].vars.size();
+    boost::char_separator<char> sep(" ");
+    tokenizer tokens(score_name, sep);
+    std::string sc_name;
+    tokenizer::iterator it = tokens.begin();
+    for (; it != tokens.end(); ++it) {
+      sc_name = *it;
+    }
+
+
+    double fit_rad = pt.get<double>("Extra.fitrad");
+    std::string prot = pt.get<std::string>("Protocol.prot");
+    std::string output_folder = pt.get<std::string>("PrintPopul.output");
+    
+    std::ofstream ofs ( string("./"+output_folder+"/population_"+sc_name+"_"+ to_string(gen) +".log") , std::ofstream::out);
+    ofs << "[CONF] " << "NP " << NP << " D " << D << " score " << sc_name << " fit_rad "<<  fit_rad << " prot " << prot << " gen " << gen << std::endl;
     for (size_t i = 0; i < popul.size(); i++) {
       ofs << "[IND] ";
       std::vector<double> vars = popul[i].vars;
@@ -79,18 +95,20 @@ public:
     boost::char_separator<char> sep(" ");
 
     std::map<string, string> configuration;
-
+    boost::shared_ptr<DE_Operator> de; 
     while (std::getline(inFile, line)) {
       tokenizer tokens(line, sep);
       if (tokens.begin() != tokens.end()) {
 	if (*tokens.begin() == "[IND]") {
 	  Individual ind;
+          de->init_popul->disturb_individual(ind, de->ffxn->D() );
 	  ind.vars = individual_strategy(tokens);
 	  population.push_back(ind);
 	}
 
 	if (*tokens.begin() == "[CONF]") {
 	  configuration = configuration_strategy(tokens);
+          de = boost::shared_ptr<DE_Operator>(new DE_Operator(configuration["prot"]));
 	}
       }
     }
@@ -110,8 +128,25 @@ public:
     }
 
     std::cout << "init de operator " << std::endl;
-    DE_Operator de(configuration["prot"]);
-    std::cout << "finish de operator " << std::endl;
 
+    write_population_pdb(de, population);
+    std::cout << "finish de operator " << std::endl;
+  }
+
+  static void write_population_pdb(boost::shared_ptr<DE_Operator> de,
+                            std::vector<Individual>& popul) {
+    core::scoring::ScoreFunctionOP scorefxn = core::scoring::ScoreFunctionFactory::create_score_function(std::string("score3").c_str());
+    de->frag_opt.scorefxn = scorefxn;
+    de->frag_opt.stage_name = std::string("stage4");
+    de->frag_mover = FragInsertionStrategy::get(FragInsertionStrategy::FragMoverTypes::greedy_search, de->frag_opt);
+    boost::shared_ptr<FitFunction> ffxn = boost::shared_ptr<FitFunction>( new PoseFragmentFunction(de->pose_, scorefxn, de->ss, de->frag_mover));
+    boost::shared_ptr<PoseFunction> pfunc = boost::dynamic_pointer_cast<PoseFunction >(ffxn);
+    core::pose::PoseOP local_pose = de->native_pose_->clone(); 
+
+    for (int i = 0; i < popul.size(); ++i) {
+     pfunc->fill_pose(local_pose, popul[i], de->ss);     
+     std::string path = "/home/dani/Workspace/RosettaEvolution/popul_pdb/popul_ind_"+ std::to_string(i) +".pdb";
+     local_pose->dump_pdb(path.c_str());
+    }
   }
 };

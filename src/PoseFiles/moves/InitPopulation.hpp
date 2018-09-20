@@ -20,7 +20,9 @@ public:
   InitPopulation(FitFunctionPtr scfxn_in) {
     scfxn = scfxn_in;
   }
-
+  virtual void disturb_individual(Individual &ind, int ind_size) {
+  }
+  
   virtual void apply(std::vector<Individual>& popul, int NP, int ind_size) {
 
     for (int i = 0; i < NP; ++i) {
@@ -221,6 +223,7 @@ public:
 
 
   void disturb_individual(Individual &ind, int ind_size) {
+    ind.vars.resize(ind_size);
      for (int j = 0; j < ind_size; ++j) {
 	if (URAND() < 0.5) {
 	  ind.vars[j] = URAND();

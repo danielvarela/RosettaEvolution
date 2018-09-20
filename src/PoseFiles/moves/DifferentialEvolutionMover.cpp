@@ -16,6 +16,8 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/date_time/local_time_adjustor.hpp>
 #include <boost/date_time/c_local_time_adjustor.hpp>
+#include <boost/optional/optional.hpp>
+
 #include "../../helper_apps/FileToPDBPrinter.hpp"
 
 MoverDE::MoverDE() {
@@ -66,6 +68,51 @@ MoverDE::MoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, std::vector<Indivi
   std::cout << " CR " << CR ;
   std::cout << " F " << F ;
   std::cout << " rad " << pt.fit_rad;
+  print_timestamp();
+  std::cout << std::endl;
+}
+
+
+MoverDE::MoverDE(boost::property_tree::ptree options, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population) {
+  srand(time(NULL));
+  app_options = options;
+  
+  use_print_class = false;
+  scfxn = scfxn_in;
+  //  init_popul_ = init_popul_in;
+
+  NP = app_options.get<int>("DE.NP");
+  Gmax = 10000;
+  D = scfxn->D();
+
+  CR = app_options.get<double>("DE.CR");
+  F = app_options.get<double>("DE.F");
+  prot = app_options.get<std::string>("Protocol.prot");
+
+  boost::property_tree::ptree::const_assoc_iterator it = app_options.find("PrintPopul.gens");
+  if(app_options.not_found() == it) {
+    std::string desired_gens_opt = app_options.get<std::string>("PrintPopul.gens");
+    boost::char_separator<char> sep(",");
+    typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
+    tokenizer tokens(desired_gens_opt,sep);
+    for (tokenizer::iterator it = tokens.begin(); it != tokens.end(); ++it) {
+      desired_gens.push_back(std::stoi(*it));
+    }
+  }
+
+  avg_acc = 1;
+  best = 100000;
+  best_idx = 0;
+  last_gen_best = 0;
+  fit_rad = app_options.get<double>("Extra.fitrad");
+  //  init_popul(popul);
+  popul = initial_population;
+  current_best_ind = popul[0];
+  std::cout << "[CONF] ";
+  std::cout << " NP " << NP ;
+  std::cout << " CR " << CR ;
+  std::cout << " F " << F ;
+  std::cout << " rad " << fit_rad;
   print_timestamp();
   std::cout << std::endl;
 }
@@ -366,9 +413,13 @@ void MoverDE::print_generation_information(int gen_count, bool new_best_found) {
       print_individual_information(gen_count, new_best_found);
 
       std::cout << "[TRIAL_SUC] " << trial_sucess_n << std::endl;
-      if ((gen_count == 1) || (gen_count == 9) || (gen_count == 50) || (gen_count == 199)) {
-	FileToPDBPrinter::population_to_file(NP, D, scfxn->name(), fit_rad, prot, gen_count, popul);
-      }
+
+      if (desired_gens.begin() != desired_gens.end()) {
+          if (std::find(desired_gens.begin(), desired_gens.end(), gen_count) !=
+              desired_gens.end()) {
+            FileToPDBPrinter::population_to_file(app_options, scfxn->name(),gen_count, popul);
+          }
+        }
     }
   }
 }
@@ -414,13 +465,14 @@ Individual MoverDE::sample_new_individual(int i, const Parents& p, std::vector<I
       diff_avg_aft += std::abs(diff);
       trial.vars[k] = popul[p.x1].vars[k] + F* (diff);
 
-      //      std::cout << "n_res " << n_res << " " << popul[i].ss[n_res] <<  std::endl;
-      // if (trial.vars[k] > DE_LIMIT) {
-      // 	trial.vars[k] = DE_LIMIT - std::abs(trial.vars[k] - DE_LIMIT);
-      // }
-      // if (trial.vars[k] < (-1*DE_LIMIT)) {
-      // 	trial.vars[k] = (-1) + std::abs(trial.vars[k] - (-1*DE_LIMIT));
-      // }
+      //           std::cout << "n_res " << n_res << " " << popul[i].ss[n_res] <<  std::endl;
+      if (trial.vars[k] > DE_LIMIT) {
+      	trial.vars[k] = DE_LIMIT - std::abs(trial.vars[k] - DE_LIMIT);
+      }
+      if (trial.vars[k] < (-1*DE_LIMIT)) {
+      	trial.vars[k] = (-1) + std::abs(trial.vars[k] - (-1*DE_LIMIT));
+      }
+      
     } else {
       trial.vars[k] = popul[i].vars[k];
     }

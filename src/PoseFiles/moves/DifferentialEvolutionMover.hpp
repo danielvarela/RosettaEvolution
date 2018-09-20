@@ -50,10 +50,13 @@ public:
   int trial_sucess_n;
   double previous_best;
   PopulComparer popul_comparer;
-
+  boost::property_tree::ptree app_options;
+  std::vector<int> desired_gens; 
+  
   MoverDE();
 
   MoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population);
+  MoverDE( boost::property_tree::ptree options , FitFunctionPtr scfxn_in, std::vector<Individual> initial_population);
 
   void print_timestamp();
 
@@ -152,6 +155,7 @@ public:
   SharedMoverDE() : MoverDE() {}
 
   SharedMoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population) : MoverDE(pt, scfxn_in, initial_population) {}
+  SharedMoverDE(boost::property_tree::ptree options, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population) : MoverDE(options, scfxn_in, initial_population) {}
 
   bool select_population(const std::vector<Individual>& trial_popul);
 
@@ -174,6 +178,10 @@ public:
   HybridMoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population,  boost::shared_ptr<LocalSearchIndividualMover> local_search_in) : MoverDE(pt, scfxn_in, initial_population) {
     local_search = local_search_in;
   }
+  HybridMoverDE(boost::property_tree::ptree options, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population,  boost::shared_ptr<LocalSearchIndividualMover> local_search_in) : MoverDE(options, scfxn_in, initial_population) {
+    local_search = local_search_in;
+  }
+
 
   void apply();
 
@@ -193,6 +201,10 @@ public:
   SharedHybridMoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population,  boost::shared_ptr<LocalSearchIndividualMover> local_search_in) : SharedMoverDE(pt, scfxn_in, initial_population) {
     local_search = local_search_in;
   }
+  SharedHybridMoverDE(boost::property_tree::ptree options, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population,  boost::shared_ptr<LocalSearchIndividualMover> local_search_in) : SharedMoverDE(options, scfxn_in, initial_population) {
+    local_search = local_search_in;
+  }
+
 
   void apply();
 
@@ -212,6 +224,10 @@ public:
   CrowdingHybridMoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population,  boost::shared_ptr<LocalSearchIndividualMover> local_search_in) : SharedHybridMoverDE(pt, scfxn_in, initial_population, local_search_in) {
     local_search = local_search_in;
   }
+  CrowdingHybridMoverDE(boost::property_tree::ptree options, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population,  boost::shared_ptr<LocalSearchIndividualMover> local_search_in) : SharedHybridMoverDE(options, scfxn_in, initial_population, local_search_in) {
+    local_search = local_search_in;
+  }
+
 
   bool select_population(const std::vector<Individual>& trial_popul);
 

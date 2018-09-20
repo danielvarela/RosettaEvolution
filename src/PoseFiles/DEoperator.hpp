@@ -121,6 +121,8 @@ public:
 
   void init_two_stages_mover();
 
+  void init_default_score();
+ 
   void init_available_stages();
 
   core::pose::PoseOP get_native_pose();
