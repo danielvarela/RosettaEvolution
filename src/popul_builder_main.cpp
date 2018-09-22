@@ -27,7 +27,8 @@ void init_rosetta() {
 
 void codified_angles_to_pdb(int argc, char** argv) {
   init_rosetta();
-  FileToPDBPrinter::print(argv[1]);
+  FileToPDBPrinter app_printer;
+  app_printer.read(argv[1]);
 }
 
 

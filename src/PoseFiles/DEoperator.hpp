@@ -69,7 +69,7 @@ public:
   std::map<std::string, Protinfo> prot_selection;
 
   enum distances_enum {
-    rmsd, rmsd_native_diff, euclidean, euclidean_loop, euclidean_diff_abs, euclidean_partial_mario, euclidean_mario, rmsd_without_superp
+    rmsd, rmsd_native_diff, euclidean, euclidean_loop, euclidean_diff_abs, euclidean_partial_mario, euclidean_mario
   };
   std::map<std::string, distances_enum> distances_map;
 
@@ -82,6 +82,13 @@ public:
     total_random, total_random_pose_based, random_pose_based, init_popul_with_stage
   };
   std::map<std::string, init_popul_strategy_enum> init_popul_strategy_map;
+
+  enum fragment_insertion_strategy_enum {
+    my_frag_insertion, greedy_search, stage_rosetta_mover, ILS_as_julia
+  };
+
+  std::map<std::string, fragment_insertion_strategy_enum> fragment_insertion_strategy_map;
+
 
   FragInsertionStrategy::FragOptions frag_opt;
   FragInsertionMoverPtr local_search_frag_mover;
@@ -103,13 +110,17 @@ public:
 
   boost::shared_ptr<InitPopulation> initialize_init_popul_strategy(std::string init_popul_option );
 
-  CalculateRmsdDistancePopulationPtr use_distances_strategy(std::string option);
+  CalculateDistancePopulationPtr use_distances_strategy(std::string option);
 
   void init_files(Protinfo prot_info);
 
   boost::shared_ptr<MoverDE> prepare_stage(std::string stage_name);
 
   void update_current_population_to_stage_score();
+
+  void initialize_local_search_to_apply_at_population(std::string option);
+
+  boost::shared_ptr<FragInsertionMover> initialize_fragment_insertion_strategy(std::string option );
 
   void initialize_population_stage1();
 
@@ -147,7 +158,7 @@ public:
   std::vector<Individual> current_population;
   FitFunctionPtr ffxn;
   PrintBestIndividualPtr print_best;
-  CalculateRmsdDistancePopulationPtr calculate_distances_popul;
+  CalculateDistancePopulationPtr calculate_distances_popul;
   InitPopulationPtr init_popul;
   boost::shared_ptr<LocalSearchIndividualMover> local_search;
   boost::property_tree::ptree app_options;

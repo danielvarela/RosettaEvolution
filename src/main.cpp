@@ -41,8 +41,8 @@ void run_operator(int argc, char** argv) {
 #include "./helper_apps/FileToPDBPrinter.hpp"
 
 void codified_angles_to_pdb(int argc, char** argv) {
-  init_rosetta();
-  FileToPDBPrinter::print(argv[1]);
+  // init_rosetta();
+  // FileToPDBPrinter::print(argv[1]);
 }
 
 void run_score(int argc, char** argv) {

@@ -28,7 +28,6 @@ DE_Operator::DE_Operator() {
   distances_map["euclidean_diff_abs"] = euclidean_diff_abs;
   distances_map["euclidean_mario"] = euclidean_mario;
   distances_map["euclidean_partial_mario"] = euclidean_partial_mario;
-  distances_map["rmsd_without_superp"] = rmsd_without_superp;
 
   protocol_name_map["Shared"] = Shared;
   protocol_name_map["HybridShared"] = HybridShared;
@@ -38,7 +37,14 @@ DE_Operator::DE_Operator() {
   init_popul_strategy_map["random_pose_based"] = random_pose_based;
   init_popul_strategy_map["total_random_pose_based"] = total_random_pose_based;
   init_popul_strategy_map["init_popul_with_stage"] = init_popul_with_stage;
+
+  fragment_insertion_strategy_map["my_frag_insertion"] = my_frag_insertion;
+  fragment_insertion_strategy_map["greedy_search"] = greedy_search;
+  fragment_insertion_strategy_map["stage_rosetta_mover"] = stage_rosetta_mover;
+  fragment_insertion_strategy_map["ILS_as_julia"] = ILS_as_julia;
+
 }
+
 
 void
 DE_Operator::init_available_stages() {
@@ -128,39 +134,35 @@ DE_Operator::init_setup() {
   // COMPLETE ABINITIO MOVER AT THE BOTTOM OF THE FILE
 }
 
-CalculateRmsdDistancePopulationPtr
+CalculateDistancePopulationPtr
 DE_Operator::use_distances_strategy(std::string option) {
   switch (distances_map[option]) {
   case rmsd: {
-    calculate_distances_popul = CalculateRmsdDistancePopulationPtr( new CalculateRmsdDistancePopulation(native_pose_, ffxn, ss, scorefxn, fit_radius));
+    calculate_distances_popul = CalculateDistancePopulationPtr( new CalculateRmsdDistancePopulation(native_pose_, ffxn, ss, scorefxn, fit_radius));
     break;
   }
   case rmsd_native_diff: {
-    calculate_distances_popul = CalculateRmsdDistancePopulationPtr( new CalculateNativeDiffDistancePopulation(native_pose_, ffxn, ss, scorefxn, fit_radius));
+    calculate_distances_popul = CalculateDistancePopulationPtr( new CalculateNativeDiffDistancePopulation(native_pose_, ffxn, ss, scorefxn, fit_radius));
     break;
   }
   case euclidean: {
-    calculate_distances_popul = CalculateRmsdDistancePopulationPtr( new CalculateEuclideanDistancePopulation(native_pose_, ffxn, ss, scorefxn, fit_radius));
+    calculate_distances_popul = CalculateDistancePopulationPtr( new CalculateEuclideanDistancePopulation(native_pose_, ffxn, ss, scorefxn, fit_radius));
     break;
   }
   case euclidean_loop: {
-    calculate_distances_popul = CalculateRmsdDistancePopulationPtr( new CalculateEuclideanLoopDistancePopulation(native_pose_, ffxn, ss, scorefxn, fit_radius));
+    calculate_distances_popul = CalculateDistancePopulationPtr( new CalculateEuclideanLoopDistancePopulation(native_pose_, ffxn, ss, scorefxn, fit_radius));
     break;
   }
   case euclidean_diff_abs: {
-    calculate_distances_popul = CalculateRmsdDistancePopulationPtr( new CalculateEuclideanDiffAbsDistancePopulation(native_pose_, ffxn, ss, scorefxn, fit_radius));
+    calculate_distances_popul = CalculateDistancePopulationPtr( new CalculateEuclideanDiffAbsDistancePopulation(native_pose_, ffxn, ss, scorefxn, fit_radius));
     break;
   }
   case euclidean_partial_mario: {
-    calculate_distances_popul = CalculateRmsdDistancePopulationPtr( new CalculateEuclideanMarioPartialDistancePopulation(native_pose_, ffxn, ss, scorefxn, fit_radius));
+    calculate_distances_popul = CalculateDistancePopulationPtr( new CalculateEuclideanMarioPartialDistancePopulation(native_pose_, ffxn, ss, scorefxn, fit_radius));
     break;
   }
   case euclidean_mario: {
-    calculate_distances_popul = CalculateRmsdDistancePopulationPtr( new CalculateEuclideanMarioDistancePopulation(native_pose_, ffxn, ss, scorefxn, fit_radius));
-    break;
-  }
-  case rmsd_without_superp: {
-    calculate_distances_popul = CalculateRmsdDistancePopulationPtr( new CalculateEuclideanRmsdWithoutSuperpDistancePopulation(native_pose_, ffxn, ss, scorefxn, fit_radius));
+    calculate_distances_popul = CalculateDistancePopulationPtr( new CalculateEuclideanMarioDistancePopulation(native_pose_, ffxn, ss, scorefxn, fit_radius));
     break;
   }
   default:
@@ -193,19 +195,36 @@ DE_Operator::prepare_stage(std::string stage_name) {
   frag_opt.scorefxn = scorefxn;
   frag_opt.stage_name = stage_name;
 
-  bool fragment_at_trials = app_options.get<bool>("Protocol.frags_at_trials");
-  
-  frag_mover = FragInsertionStrategy::get(FragInsertionStrategy::FragMoverTypes::greedy_search, frag_opt);
-  if (fragment_at_trials) {
-    ffxn = boost::shared_ptr<FitFunction>( new PoseFragmentFunction(pose_, scorefxn, ss, frag_mover));
+  bool fragment_at_trials = false;
+  boost::property_tree::ptree::const_assoc_iterator it = app_options.find("Fragments.strategy_at_trials");
+  if(app_options.not_found() == it) {
+    fragment_at_trials = true;
+    frag_mover = initialize_fragment_insertion_strategy(app_options.get<std::string>("Fragments.strategy_at_trials"));
+  } else {
+    fragment_at_trials = false;
+    frag_mover = initialize_fragment_insertion_strategy("my_frag_insertion");
+  }
+
+   if (fragment_at_trials) {
+     ffxn = boost::shared_ptr<FitFunction>( new PoseFragmentFunction(pose_, scorefxn, ss, frag_mover));
+
   } else {
     ffxn = boost::shared_ptr<FitFunction>( new PoseScoreFunction(pose_, scorefxn, ss, frag_mover));
   }
- 
-  //ffxn = boost::shared_ptr<FitFunction>( new PoseToyFunction(pose_, scorefxn, ss, frag_mover));
-  local_search_frag_mover = FragInsertionStrategy::get(FragInsertionStrategy::FragMoverTypes::stage3mover, frag_opt);
-  local_search = boost::shared_ptr<LocalSearchIndividualMover>(
-							       new LocalSearchIndividualMover(pose_, scorefxn, ss, local_search_frag_mover));
+
+
+   if (app_options.get<std::string>("Protocol.name") =="HybridShared") {
+     bool fragment_at_popul = false;
+     boost::property_tree::ptree::const_assoc_iterator it = app_options.find("Fragments.strategy_at_population");
+     if(app_options.not_found() == it) {
+       fragment_at_popul = true;
+       initialize_local_search_to_apply_at_population(app_options.get<std::string>("Fragments.strategy_at_population"));
+     } else {
+       //default option
+       initialize_local_search_to_apply_at_population(std::string("stage_rosetta_mover"));
+     }
+  }
+
 
   ffxn->name_ = std::string("Score Function for stage " + stage_name);
   print_best = PrintBestIndividualPtr( new PrintBestIndividual(pose_, ffxn, ss, scorefxn));
@@ -224,6 +243,43 @@ DE_Operator::prepare_stage(std::string stage_name) {
   //  de->popul = current_population;
 
   return de;
+}
+
+void
+DE_Operator::initialize_local_search_to_apply_at_population(std::string input_option) {
+  local_search_frag_mover = initialize_fragment_insertion_strategy(input_option);
+  local_search = boost::shared_ptr<LocalSearchIndividualMover>(new LocalSearchIndividualMover(pose_, scorefxn, ss, local_search_frag_mover));
+}
+
+boost::shared_ptr<FragInsertionMover>
+DE_Operator::initialize_fragment_insertion_strategy(std::string input_option ) {
+ boost::shared_ptr<FragInsertionMover> strategy_return;
+
+  switch (fragment_insertion_strategy_map[input_option]) {
+  case my_frag_insertion: {
+    strategy_return = FragInsertionStrategy::get(FragInsertionStrategy::FragMoverTypes::my_frag_insertion, frag_opt);
+    break;
+  }
+  case greedy_search: {
+    strategy_return = FragInsertionStrategy::get(FragInsertionStrategy::FragMoverTypes::greedy_search, frag_opt);
+    break;
+  }
+  case stage_rosetta_mover: {
+    strategy_return = FragInsertionStrategy::get(FragInsertionStrategy::FragMoverTypes::stage_rosetta_mover, frag_opt);
+    break;
+  }
+  case ILS_as_julia: {
+    strategy_return = FragInsertionStrategy::get(FragInsertionStrategy::FragMoverTypes::ILS_as_julia, frag_opt);
+    break;
+  }
+  default:
+    std::cout << "no insertion strategy option" << std::endl;
+    exit(1);
+    break;
+  }
+  return strategy_return;
+
+
 }
 
 boost::shared_ptr<InitPopulation>
@@ -282,7 +338,7 @@ DE_Operator::update_current_population_to_stage_score( ) {
     std::cout << "error, the current population was not initialize" << std::endl;
     exit(1);
   } else {
-    CalculateRmsdDistancePopulation::DistancesResult result =
+    CalculateDistancePopulation::DistancesResult result =
       calculate_distances_popul->run(current_population);
     std::vector<double> current_rmsd = result.rmsd_to_native;
     // rescore population

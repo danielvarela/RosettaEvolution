@@ -205,7 +205,7 @@ void HybridMoverDE::apply() {
 
       Individual ind = sample_new_individual(i, parents, popul);
       if (CR > 0.5) {
-	double new_rmsd = calculate_distances_popul->rmsd_between_inds(ind, popul[parents.x1]);
+	double new_rmsd = calculate_distances_popul->distance_between_inds(ind, popul[parents.x1]);
 	if (new_rmsd > global_max_rmsd) {
 	  global_max_rmsd = new_rmsd;
 	}
@@ -214,7 +214,7 @@ void HybridMoverDE::apply() {
 	}
 	global_avg_rmsd += new_rmsd;
       } else {
-	double new_rmsd = calculate_distances_popul->rmsd_between_inds(ind, popul[i]);
+	double new_rmsd = calculate_distances_popul->distance_between_inds(ind, popul[i]);
 	std::cout << "rmsd parent " << i << " " << new_rmsd << std::endl;
       }
 
@@ -294,6 +294,18 @@ bool CrowdingHybridMoverDE::select_population(const std::vector<Individual>& tri
 }
 
 
+void CrowdingMoverDE::print_fitness_population(int gen_count) {
+  //if ((gen_count < 25) || (gen_count % 50 == 0)) {
+  if (true) {
+    std::cout << "[POP] ";
+    for (int i = 0; i < popul.size(); i++) {
+      std::cout << (-1 * SCORE_ERROR_FIXED) + popul[i].score << " ";
+    }
+    std::cout << std::endl;
+  }
+}
+
+
 bool CrowdingMoverDE::select_population(const std::vector<Individual>& trial_popul) {
   trial_sucess_n = 0;
   // Crowding DE: Rene Thomsen Algorithm
@@ -340,7 +352,7 @@ bool SharedMoverDE::select_population(const std::vector<Individual>& trial_popul
   double using_sf = false;
 
   using_sf = true;
-  CalculateRmsdDistancePopulation::DistancesResult result =
+  CalculateDistancePopulation::DistancesResult result =
     calculate_distances_popul->run(large_popul);
 
   shared_fitness = result.shared_fitness;
@@ -600,7 +612,7 @@ void SharedMoverDE::print_distances_population() {
   std::vector<double> ind_distance_avg = copy_popul_shared_fitness_for_print;
 
 
-  CalculateRmsdDistancePopulation::DistancesResult result =
+  CalculateDistancePopulation::DistancesResult result =
                                         calculate_distances_popul->run(popul);
 
   int large_NP = copy_popul_fitness_for_print.size();
@@ -664,7 +676,7 @@ void SharedMoverDE::print_distances_population() {
 
 
 void MoverDE::print_distances_population() {
-  // CalculateRmsdDistancePopulation::DistancesResult result =
+  // CalculateDistancePopulation::DistancesResult result =
   //                                       calculate_distances_popul->run(popul);
 
   // std::vector<double> ind_distance_avg = result.distances_of_population;
@@ -787,7 +799,7 @@ void SharedHybridMoverDE::apply() {
       total_diff_avg_bef += diff_avg_bef;
       total_diff_avg_aft += diff_avg_aft;
       if (CR > 0.5) {
-	double new_rmsd = calculate_distances_popul->rmsd_between_inds(ind, popul[parents.x1]);
+	double new_rmsd = calculate_distances_popul->distance_between_inds(ind, popul[parents.x1]);
 	//	std::cout << "rmsd parent " << i << " " << new_rmsd << std::endl;
 	if (new_rmsd > global_max_rmsd) {
 	  global_max_rmsd = new_rmsd;
@@ -797,7 +809,7 @@ void SharedHybridMoverDE::apply() {
 	}
 	global_avg_rmsd += new_rmsd;
       } else {
-	double new_rmsd = calculate_distances_popul->rmsd_between_inds(ind, popul[i]);
+	double new_rmsd = calculate_distances_popul->distance_between_inds(ind, popul[i]);
 	std::cout << "rmsd parent " << i << " " << new_rmsd << std::endl;
       }
 

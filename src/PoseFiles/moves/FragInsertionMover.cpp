@@ -2,6 +2,7 @@
 #include "FitFunction.hpp"
 #include "FragInsertionMover.hpp"
 
+#include <core/scoring/Energies.hh>
 
 void
 CompleteAbinitioSampler::apply(core::pose::Pose& pose_, FuncStats& stats) {
@@ -44,12 +45,12 @@ CompleteAbinitioSampler::apply( core::pose::Pose &pose ) {
 
 
 void
-Stage3Sampler::apply(core::pose::Pose& pose_, FuncStats& stats) {
+StageRosettaSampler::apply(core::pose::Pose& pose_, FuncStats& stats) {
   apply(pose_);
 }
 
 void
-Stage3Sampler::apply( core::pose::Pose &pose ) {
+StageRosettaSampler::apply( core::pose::Pose &pose ) {
   using namespace protocols::moves;
 
   if (rosetta_stage == "stage2") {
@@ -222,8 +223,7 @@ LocalSearchFragMover::apply(core::pose::Pose& pose_) {
   int cnt = 0;
 
   int hill_moves_without_increase = 0;
-  do
-    {
+  do {
       frag_mover->apply(inner_pose);
       current_score = (*sfxn)(inner_pose);
       if (current_score < init_score) {
@@ -255,7 +255,7 @@ ILSFragMover::apply(core::pose::Pose& pose_) {
 
 
 void
-InitStagesMover::apply(core::pose::Pose& pose){
+InitStagesMover::apply(core::pose::Pose& pose) {
   sampler->init(pose);
   sampler->apply(pose);
 }
@@ -276,7 +276,7 @@ CompleteAbinitioMover::apply(core::pose::Pose& pose_) {
 }
 
 void
-Stage3Mover::apply(core::pose::Pose& pose_) {
+StageRosettaMover::apply(core::pose::Pose& pose_) {
   core::pose::Pose pose_backup = pose_;
   double init_score = (*sfxn)(pose_);
   sampler->init(pose_);
@@ -291,7 +291,7 @@ Stage3Mover::apply(core::pose::Pose& pose_) {
 
 
 void
-NoGreedyStage3Mover::apply(core::pose::Pose& pose_) {
+NoGreedyStageRosettaMover::apply(core::pose::Pose& pose_) {
   core::pose::Pose pose_backup = pose_;
   double init_score = (*sfxn)(pose_);
   sampler->init(pose_);

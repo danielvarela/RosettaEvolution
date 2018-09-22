@@ -265,37 +265,13 @@ public:
   }
 
   double score(Individual& ind) override {
-    // fill_pose(pose_, ind, ss);
-    // double result = (*scorefxn)(*pose_);
-    // ind.score = result;
-    // return result;
-
     return apply_fragment_stage(ind);
-
-    // fill_pose(pose_, ind, ss);
-    // double result = (*scorefxn)(*pose_);
-    // ind.score = result;
-
-    // double new_result = run_frag_mover(*pose_);
-    // // it shows the error despite is the same
-    // // if (result < new_result) {
-    // //   std::cout << "ERROR APPLYING ILS SEARCH MOVER " << std::endl;
-    // //   std::cout << "init result" << result << " after frag is " << new_result << std::endl;
-    // // }
-
-    // //from pose to ind
-    // pose_to_ind(pose_, ind);
-    // ind.score = new_result;
-
-    // return result;
   }
 
   double apply_fragment_stage(Individual& ind) {
     fill_pose(pose_, ind, ss);
     double result = SCORE_ERROR_FIXED + (*scorefxn)(*pose_);
     ind.score = result;
-    return result;
-
     core::pose::PoseOP pose_backup = pose_->clone();
     double result_after_frags = run_frag_mover(*pose_);
     if (result_after_frags < result) {

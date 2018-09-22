@@ -43,7 +43,7 @@ class MoverDE
 {
 public:
   PrintBestIndividualPtr print_best_ind;
-  CalculateRmsdDistancePopulationPtr calculate_distances_popul;
+  CalculateDistancePopulationPtr calculate_distances_popul;
   bool use_print_class;
   bool new_best_found;
   Individual current_best_ind;
@@ -222,6 +222,7 @@ public:
 
   bool select_population(const std::vector<Individual>& trial_popul);
 
+  void print_fitness_population(int gen_count);
 
   void select_parents(int i, Parents& parent);
 };
