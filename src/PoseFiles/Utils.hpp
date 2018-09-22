@@ -81,9 +81,8 @@ inline void read_pose(std::string pdb_path, core::pose::Pose& pose_ ) {
 
   std::cout << "pose from file" << std::endl;
   std::cout << "pdb_path " << pdb_path.c_str() << std::endl;
-  core::pose::Pose veamos;
-  core::import_pose::pose_from_file(pose_, pdb_path.c_str(), false, core::import_pose::FileType::PDB_file);
-
+  //core::import_pose::pose_from_file(pose_, pdb_path.c_str(), false, core::import_pose::FileType::PDB_file);
+  core::import_pose::centroid_pose_from_pdb(pose_, pdb_path.c_str(), false);
   std::string sequence = pose_.sequence();
 
   std::cout << "size seq " << pose_.size() << std::endl;
