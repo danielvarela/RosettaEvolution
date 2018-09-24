@@ -85,6 +85,42 @@ public:
     std::cout << "init de operator " << std::endl;
     std::vector<core::pose::PoseOP> popul_pdb;
     build_pdb_population(popul_pdb);
+    // de, population y popul_pdb ->
+    // deberia calcular distancias en rmsd, partial_mario y diff absoluto
+    // construir json con todos los datos e imprimirlo en un fichero que lee el servidor
+    CalculateDistancePopulationPtr distance_calculator = de->use_distances_strategy("rmsd_native_diff");
+    //distance_calculator->fit_radius = configuration["fit_radius"];
+    distance_calculator->fit_radius = 10.0;
+    CalculateDistancePopulation::DistancesResult result = distance_calculator->run(population);
+
+
+    std::ofstream ofs ( string("/home/dvarela/Code/RosettaEvolution/neighs_example.json") , std::ofstream::out);
+    ofs << "{ \"neighs\" : [" << std::endl;
+    for (int i = 0; i < result.neigh_per_ind.size(); i++) {
+      std::vector<NeighStruct> neighs = result.neigh_per_ind[i];
+      ofs << " [ ";
+      for (int j = 0; j < neighs.size(); j++) {
+	if (j == (neighs.size() - 1)) {
+	  ofs << "{ \"ind\" : " << neighs[j].index << " , \"dist\" : " << neighs[j].distance << " } ] ";
+	} else {
+	  ofs << "{ \"ind\" : " << neighs[j].index << " , \"dist\" : " << neighs[j].distance << " } , ";
+	}
+      }
+
+      if (i == (result.neigh_per_ind.size() -1 ) ) {
+	ofs << " ] " << std::endl;
+      } else {
+	ofs << " , " << std::endl;
+      }
+
+    }
+    ofs << "}" << std::endl;
+
+    // shared_fitness = result.shared_fitness;
+    // rmsd_to_native = result.rmsd_to_native;
+    // neighs_per_ind = result.neigh_per_ind;
+    // ind_inter_distance = result.distances_of_population;
+
     // write_population_pdb(de, population);
     std::cout << "finish de operator " << std::endl;
   }
@@ -99,11 +135,9 @@ public:
       popul_pdb.push_back(local_pose);
       std::cout << "score " << i << " : " << (*scorefxn)(*popul_pdb[i]) << std::endl;
     }
-
     for (int i = 0; i < population.size(); ++i) {
      std::cout << "score " << i << " : " << (*scorefxn)(*popul_pdb[i]) << std::endl;
     }
-
   }
 
   void print_at_screen() {
@@ -135,7 +169,7 @@ public:
 
    void write_population_pdb(boost::shared_ptr<DE_Operator> de,
                             std::vector<Individual>& popul) {
-   core::pose::PoseOP local_pose = de->native_pose_->clone();
+     core::pose::PoseOP local_pose = de->native_pose_->clone();
 
     for (int i = 0; i < popul.size(); ++i) {
      pfunc->fill_pose(local_pose, popul[i], de->ss);     

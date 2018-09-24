@@ -8,6 +8,7 @@
 #include <string>
 #include <map>
 #include <utility>
+
 InterDistancesGraph::InterDistancesGraph() {
   for (double i = 0; i < 5; i = i + 0.1) {
     bin_values.push_back(i);
@@ -77,7 +78,7 @@ CalculateDistancePopulation::DistancesResult
 CalculateDistancePopulation::run(const std::vector<Individual>& popul) {
   CalculateDistancePopulation::DistancesResult result;
   std::vector<double> shared_fitness, rmsd_to_native, distances_of_population;
-  std::vector<int> neigh_per_ind;
+  std::vector<std::vector<NeighStruct> > neigh_per_ind;
 
 
   build_pdb_population(popul, popul_pdb);
@@ -136,17 +137,19 @@ CalculateDistancePopulation::find_nearest_parent(int ind_idx, Individual target,
   }
   return solution;
 }
-double  CalculateDistancePopulation::distance_of_individual(core::pose::PoseOP pose_ind,const std::vector<core::pose::PoseOP>& popul_pdb, double& shared_acc, int& neighs, std::vector<double>& ind_distances) {
+double  CalculateDistancePopulation::distance_of_individual(core::pose::PoseOP pose_ind,const std::vector<core::pose::PoseOP>& popul_pdb, double& shared_acc, std::vector<NeighStruct>& neighs, std::vector<double>& ind_distances) {
   double total_dist = 0.0, ind_dist = 0.0, sh_aux = 0.0;
   int popul_pdb_size = popul_pdb.size();
-  int neigh = 0;
+  neighs.resize(0);
 
   for (int j = 0; j < popul_pdb_size; j++) {
     ind_dist = current_distance_calculation(*popul_pdb[j], *pose_ind);
     ind_distances.push_back(ind_dist);
     if (ind_dist < fit_radius) {
       sh_aux += (1 - pow( (ind_dist / fit_radius) , 2 ));
-      neigh++;
+      //neigh
+      NeighStruct n(j, ind_dist);
+      neighs.push_back(n);
     }
     total_dist += ind_dist;
   }
@@ -158,7 +161,6 @@ double  CalculateDistancePopulation::distance_of_individual(core::pose::PoseOP p
   }
 
   shared_acc = sh_aux;
-  neighs = neigh;
 
   return total_dist;
 }
@@ -190,7 +192,7 @@ CalculateDistancePopulation::find_nearest(Individual target, const std::vector<I
 
 
 void
-CalculateDistancePopulation::apply_to_population(const std::vector<Individual>& popul, std::vector<double>& shared_fitness, std::vector<double>& rmsd_to_native,std::vector<double>& distances_of_population, std::vector<int>& neigh_per_ind  ) {
+CalculateDistancePopulation::apply_to_population(const std::vector<Individual>& popul, std::vector<double>& shared_fitness, std::vector<double>& rmsd_to_native,std::vector<double>& distances_of_population, std::vector<std::vector<NeighStruct> >& neigh_per_ind  ) {
   double avg_distance_of_ind = 0.0;
   std::vector<double> ind_distance_avg;
   std::vector<double> shared_fitness_ind;
@@ -198,10 +200,9 @@ CalculateDistancePopulation::apply_to_population(const std::vector<Individual>& 
   double dist_avg;
   int popul_size = popul_pdb.size();
   double sh;
-  int neighs;
-
   std::vector<double> ind_distances;
   for (int i = 0; i < popul_size; i++) {
+    std::vector<NeighStruct> neighs;
     pose_ind = popul_pdb[i];
     rmsd_to_native_vector.push_back( core::scoring::CA_rmsd(*pose_ind, *native_));
     dist_avg = distance_of_individual(pose_ind, popul_pdb, sh, neighs, ind_distances);
@@ -524,7 +525,7 @@ CalculateEuclideanMarioPartialDistancePopulation::build_inter_distances_of_strai
 }
 
 void
-CalculateEuclideanMarioPartialDistancePopulation::apply_to_population(const std::vector<Individual>& popul, std::vector<double>& shared_fitness, std::vector<double>& rmsd_to_native,std::vector<double>& distances_of_population, std::vector<int>& neigh_per_ind  ) {
+CalculateEuclideanMarioPartialDistancePopulation::apply_to_population(const std::vector<Individual>& popul, std::vector<double>& shared_fitness, std::vector<double>& rmsd_to_native,std::vector<double>& distances_of_population, std::vector<std::vector<NeighStruct> >& neigh_per_ind  ) {
   double avg_distance_of_ind = 0.0;
   std::vector<double> ind_distance_avg;
   std::vector<double> shared_fitness_ind;
@@ -532,8 +533,6 @@ CalculateEuclideanMarioPartialDistancePopulation::apply_to_population(const std:
   double dist_avg;
   int popul_size = popul.size();
   double sh;
-  int neighs;
-
   std::vector<double> ind_distances;
 
   // build inter_distances_per_ind;
@@ -541,6 +540,7 @@ CalculateEuclideanMarioPartialDistancePopulation::apply_to_population(const std:
   build_inter_distances_of_population(popul);
 
   for (int i = 0; i < popul_size; i++) {
+    std::vector<NeighStruct> neighs;
     rmsd_to_native_vector.push_back( core::scoring::CA_rmsd(*popul_pdb[i], *native_));
 
     inter_distance_individual_1 = inter_distances_per_ind[i];
@@ -556,13 +556,12 @@ CalculateEuclideanMarioPartialDistancePopulation::apply_to_population(const std:
 }
 
 double
-CalculateEuclideanMarioPartialDistancePopulation::distance_of_individual_partial_mario_euclidean(core::pose::PoseOP pose_ind,const std::vector<Individual>& popul, double& shared_acc, int& neighs, std::vector<double>& ind_distances) {
+CalculateEuclideanMarioPartialDistancePopulation::distance_of_individual_partial_mario_euclidean(core::pose::PoseOP pose_ind,const std::vector<Individual>& popul, double& shared_acc,std::vector<NeighStruct>& neighs, std::vector<double>& ind_distances) {
   double euc = 0.0, ind_euc = 0.0, sh_aux = 0.0;
   //    double fit_radius = 0.001;
   //double fit_radius = 0.001;
   int popul_size = popul.size();
-  int neigh = 0;
-
+  neighs.resize(0);
   double min_inter_distance = 1000, max_inter_distance = -1000;
   for (int j = 0; j < popul_size; j++) {
     inter_distance_individual_2 = inter_distances_per_ind[j];
@@ -576,10 +575,12 @@ CalculateEuclideanMarioPartialDistancePopulation::distance_of_individual_partial
     }
 
     ind_distances.push_back(ind_euc);
+
     if (ind_euc < fit_radius) {
       double sh_acc =  (1 -  (ind_euc / fit_radius));
       sh_aux += sh_acc;
-      neigh++;
+      NeighStruct n(j, ind_euc);
+      neighs.push_back(n);
     }
     euc += ind_euc;
   }
@@ -592,7 +593,6 @@ CalculateEuclideanMarioPartialDistancePopulation::distance_of_individual_partial
   }
 
   shared_acc = sh_aux;
-  neighs = neigh;
 
   return euc;
 }

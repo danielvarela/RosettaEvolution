@@ -117,7 +117,7 @@ public:
   int index;
   double fit_shared;
   double rmsd;
-  int neighs;
+  std::vector<NeighStruct> neighs;
 
   SharedFitnessIndividual(boost::shared_ptr<Individual> ind_input) :
     ind(ind_input) {
@@ -149,7 +149,7 @@ public:
   std::vector<double> shared_fitness, rmsd_to_native,   ind_inter_distance;
   std::vector<Individual> copy_popul_fitness_for_print;
   std::vector<double> copy_popul_shared_fitness_for_print;
-  std::vector<int> neighs_per_ind;
+  std::vector<std::vector<NeighStruct> > neighs_per_ind;
   RescaledSharedFitnessComparer cmp_shared_fitness;
 
   SharedMoverDE() : MoverDE() {}
@@ -170,7 +170,8 @@ class HybridMoverDE : public MoverDE
 {
 public:
   std::vector<double> shared_fitness, rmsd_to_native,   ind_inter_distance;
-  std::vector<int> neighs_per_ind;
+
+  std::vector<std::vector<NeighStruct> > neighs_per_ind;
   RescaledFitnessComparer cmp_score;
   RescaledSharedFitnessComparer cmp_shared_fitness;
   boost::shared_ptr<LocalSearchIndividualMover> local_search;
@@ -193,7 +194,6 @@ class SharedHybridMoverDE : public SharedMoverDE
 {
 public:
   std::vector<double> shared_fitness, rmsd_to_native,   ind_inter_distance;
-  std::vector<int> neighs_per_ind;
   RescaledFitnessComparer cmp_score;
   RescaledSharedFitnessComparer cmp_shared_fitness;
   boost::shared_ptr<LocalSearchIndividualMover> local_search;
@@ -232,7 +232,6 @@ class CrowdingHybridMoverDE : public SharedHybridMoverDE
 {
 public:
   std::vector<double> shared_fitness, rmsd_to_native,   ind_inter_distance;
-  std::vector<int> neighs_per_ind;
   boost::shared_ptr<LocalSearchIndividualMover> local_search;
 
   CrowdingHybridMoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population,  boost::shared_ptr<LocalSearchIndividualMover> local_search_in) : SharedHybridMoverDE(pt, scfxn_in, initial_population, local_search_in) {

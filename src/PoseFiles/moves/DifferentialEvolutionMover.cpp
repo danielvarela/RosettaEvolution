@@ -662,13 +662,13 @@ void SharedMoverDE::print_distances_population() {
     std::cout << "[NEIGH] ";
 
     for (int i = 0; i < large_NP; i++) {
-      std::cout << neighs_per_ind[i] << " ";
+      std::cout << neighs_per_ind[i].size() << " ";
     }
     std::cout << std::endl;
   } else {
     std::cout << "[NEIGH] ";
     for (int i = 0; i < NP; i++) {
-      std::cout << result.neigh_per_ind[i] << " ";
+      std::cout << result.neigh_per_ind[i].size() << " ";
     }
     std::cout << std::endl;
   }

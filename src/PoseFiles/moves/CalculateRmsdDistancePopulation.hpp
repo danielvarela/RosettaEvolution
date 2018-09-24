@@ -23,6 +23,16 @@ public:
   std::string print_graph();
 };
 
+class NeighStruct
+{
+public:
+  NeighStruct() : index(0), distance(0) {}
+  NeighStruct(int i, double d) : index(i), distance(d) {}
+
+  int index;
+  double distance;
+};
+
 class CalculateDistancePopulation
 {
 public:
@@ -40,7 +50,7 @@ public:
     DistancesResult() {}
 
     std::vector<double> shared_fitness, rmsd_to_native, distances_of_population;
-    std::vector<int> neigh_per_ind;
+    std::vector<std::vector<NeighStruct> > neigh_per_ind;
   };
 
 
@@ -54,9 +64,9 @@ public:
   run(const std::vector<Individual>& popul);
 
   virtual void
-  apply_to_population(const std::vector<Individual>& popul, std::vector<double>& shared_fitness, std::vector<double>& rmsd_to_native,std::vector<double>& distances_of_population, std::vector<int>& neigh_per_ind  );
+  apply_to_population(const std::vector<Individual>& popul, std::vector<double>& shared_fitness, std::vector<double>& rmsd_to_native,std::vector<double>& distances_of_population, std::vector<std::vector<NeighStruct> >& neigh_per_ind  );
 
-  double distance_of_individual(core::pose::PoseOP pose_ind,const std::vector<core::pose::PoseOP>& popul_pdb, double& shared_acc, int& neighs, std::vector<double>& ind_distances);
+  double distance_of_individual(core::pose::PoseOP pose_ind,const std::vector<core::pose::PoseOP>& popul_pdb, double& shared_acc, std::vector<NeighStruct>& neighs, std::vector<double>& ind_distances);
 
   void print_distance_population( const std::vector<Individual>& popul ) ;
 
@@ -190,13 +200,13 @@ public:
   CalculateEuclideanMarioPartialDistancePopulation (const core::pose::PoseOP& p , FitFunctionPtr sfxn,  std::string ss_in, core::scoring::ScoreFunctionOP pscore, double radius) ;
 
   void
-  apply_to_population(const std::vector<Individual>& popul, std::vector<double>& shared_fitness, std::vector<double>& rmsd_to_native,std::vector<double>& distances_of_population, std::vector<int>& neigh_per_ind  );
+  apply_to_population(const std::vector<Individual>& popul, std::vector<double>& shared_fitness, std::vector<double>& rmsd_to_native,std::vector<double>& distances_of_population, std::vector<std::vector<NeighStruct> >& neigh_per_ind  );
 
   double
   current_distance_calculation(core::pose::Pose& pose_1, core::pose::Pose& pose_2);
 
   double
-  distance_of_individual_partial_mario_euclidean(core::pose::PoseOP pose_ind ,const std::vector<Individual>& popul, double& shared_acc, int& neighs, std::vector<double>& ind_distances);
+  distance_of_individual_partial_mario_euclidean(core::pose::PoseOP pose_ind ,const std::vector<Individual>& popul, double& shared_acc, std::vector<NeighStruct>& neighs, std::vector<double>& ind_distances);
 
   void
   build_inter_distances_of_straight();
