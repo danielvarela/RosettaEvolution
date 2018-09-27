@@ -67,7 +67,7 @@ CalculateDistancePopulation::build_pdb_population(const std::vector<Individual>&
     popul_pdb.resize(0);
     core::pose::PoseOP local_pose;
     for (int i = 0; i < population.size(); ++i) {
-      local_pose = native_->clone();
+      local_pose = pose_ind->clone();
       pfunc->fill_pose(local_pose, population[i], ss);
       popul_pdb.push_back(local_pose);
     }
@@ -503,7 +503,7 @@ CalculateEuclideanMarioPartialDistancePopulation::CalculateEuclideanMarioPartial
 
 void
 CalculateEuclideanMarioPartialDistancePopulation::build_inter_distances_of_straight() {
-  core::pose::PoseOP straight = native_->clone();
+  core::pose::PoseOP straight = pose_ind->clone();
 
   for (int i = 1; i <= straight->total_residue(); i++) {
     straight->set_phi(i, 180.0);
@@ -601,7 +601,7 @@ void
 CalculateEuclideanMarioPartialDistancePopulation::build_inter_distances_of_population( const std::vector<Individual>& popul) {
   for (int i = 0; i < popul.size(); i++) {
     core::pose::PoseOP pose_ind_1, pose_ind_2;
-    pose_ind_1 = native_->clone();
+    pose_ind_1 = pose_ind->clone();
     pfunc->fill_pose(pose_ind_1, popul[i], ss);
 
     std::vector<double> inter_distance_individual_1;

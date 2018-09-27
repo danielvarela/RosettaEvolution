@@ -88,14 +88,82 @@ public:
     // de, population y popul_pdb ->
     // deberia calcular distancias en rmsd, partial_mario y diff absoluto
     // construir json con todos los datos e imprimirlo en un fichero que lee el servidor
-    CalculateDistancePopulationPtr distance_calculator = de->use_distances_strategy("rmsd_native_diff");
-    //distance_calculator->fit_radius = configuration["fit_radius"];
-    distance_calculator->fit_radius = 10.0;
-    CalculateDistancePopulation::DistancesResult result = distance_calculator->run(population);
-
-
     std::ofstream ofs ( string("/home/dvarela/Code/RosettaEvolution/neighs_example.json") , std::ofstream::out);
-    ofs << "{ \"neighs\" : [" << std::endl;
+    std::string calculate_option;
+    CalculateDistancePopulationPtr distance_calculator;
+
+    calculate_option = std::string("rmsd_native_diff");
+    distance_calculator = de->use_distances_strategy(calculate_option);
+    char* tmp = getenv( "diff_abs_rad" );
+    double diff_abs_rad = 1.0;
+    if ( tmp == NULL ) {
+      diff_abs_rad = 1.0;
+    } else {
+      diff_abs_rad = std::atof(std::string(tmp).c_str());
+    }
+    tmp = getenv( "rmsd_rad" );
+    double rmsd_rad = 1.0;
+    if ( tmp == NULL ) {
+      rmsd_rad = 1.0;
+    } else {
+      rmsd_rad = std::atof(std::string(tmp).c_str());
+    }
+    tmp = getenv( "partial_mario_rad" );
+    double partial_mario_rad = 1.0;
+    if ( tmp == NULL ) {
+      partial_mario_rad = 1.0;
+    } else {
+      partial_mario_rad = std::atof(std::string(tmp).c_str());
+    }
+
+
+
+
+    distance_calculator->fit_radius = diff_abs_rad;
+    ofs << "{ \"neighs_data\" : { ";
+    print_distances_calculations(distance_calculator, calculate_option, ofs);
+    ofs << "," << std::endl;
+    calculate_option = std::string("rmsd");
+    distance_calculator = de->use_distances_strategy(calculate_option);
+    distance_calculator->fit_radius = rmsd_rad;
+    print_distances_calculations(distance_calculator, calculate_option, ofs);
+    ofs << "," << std::endl;
+    calculate_option = std::string("euclidean_partial_mario");
+    distance_calculator = de->use_distances_strategy(calculate_option);
+    distance_calculator->fit_radius = partial_mario_rad;
+     CalculateDistancePopulation::DistancesResult result = print_distances_calculations(distance_calculator, calculate_option, ofs);
+    ofs << " }, " << std::endl;
+    ofs << " \"score_values\" : [ ";
+      for (int i = 0; i < score_values.size(); i++) {
+	if (i == (score_values.size() - 1 )) {
+	  ofs << score_values[i];
+	} else {
+	  ofs << score_values[i] << " , ";
+	}
+    }
+    ofs << " ] " << std::endl;
+    ofs << " , " << std::endl;
+    ofs << " \"rmsd_values\" : [ ";
+      for (int i = 0; i < result.rmsd_to_native.size(); i++) {
+	if (i == (result.rmsd_to_native.size() - 1 )) {
+	  ofs << result.rmsd_to_native[i];
+	} else {
+	  ofs << result.rmsd_to_native[i] << " , ";
+	}
+    }
+    ofs << " ] " << std::endl;
+
+     ofs << " } " << std::endl;
+
+    write_population_pdb(de, population);
+    std::cout << "finish de operator " << std::endl;
+  }
+
+  CalculateDistancePopulation::DistancesResult
+  print_distances_calculations(CalculateDistancePopulationPtr distance_calculator, std::string calculate_option, std::ofstream& ofs) {
+    CalculateDistancePopulation::DistancesResult result = distance_calculator->run(population);
+    //   ofs << "{ \"neighs_"+calculate_option+"\" : [" << std::endl;
+   ofs << " \"neighs_"+calculate_option+"\" : [" << std::endl;
     for (int i = 0; i < result.neigh_per_ind.size(); i++) {
       std::vector<NeighStruct> neighs = result.neigh_per_ind[i];
       ofs << " [ ";
@@ -114,30 +182,27 @@ public:
       }
 
     }
-    ofs << "}" << std::endl;
-
-    // shared_fitness = result.shared_fitness;
-    // rmsd_to_native = result.rmsd_to_native;
-    // neighs_per_ind = result.neigh_per_ind;
-    // ind_inter_distance = result.distances_of_population;
-
-    // write_population_pdb(de, population);
-    std::cout << "finish de operator " << std::endl;
+    //    ofs << "}" << std::endl;
+    ofs << " " << std::endl;
+    return result;
   }
+
+  std::vector<double> score_values;
 
   void build_pdb_population(std::vector<core::pose::PoseOP>& popul_pdb) {
     popul_pdb.resize(0);
     core::pose::PoseOP local_pose;
     core::scoring::ScoreFunctionOP scorefxn = core::scoring::ScoreFunctionFactory::create_score_function(std::string("score3").c_str());
+    score_values.resize(0);
     for (int i = 0; i < population.size(); ++i) {
       local_pose = de->native_pose_->clone();
       pfunc->fill_pose(local_pose, population[i], de->ss);
       popul_pdb.push_back(local_pose);
-      std::cout << "score " << i << " : " << (*scorefxn)(*popul_pdb[i]) << std::endl;
+      double score =  (*scorefxn)(*popul_pdb[i]);
+      score_values.push_back( score  );
+      std::cout << "score " << i << " : " << score << std::endl;
     }
-    for (int i = 0; i < population.size(); ++i) {
-     std::cout << "score " << i << " : " << (*scorefxn)(*popul_pdb[i]) << std::endl;
-    }
+
   }
 
   void print_at_screen() {
@@ -158,7 +223,8 @@ public:
   }
 
   void init_differential_evolution() {
-    de = boost::shared_ptr<DE_Operator>(new DE_Operator(configuration["prot"]));
+    //de = boost::shared_ptr<DE_Operator>(new DE_Operator(configuration["prot"]));
+    de = boost::shared_ptr<DE_Operator>(new DE_Operator("1elwA"));
     core::scoring::ScoreFunctionOP scorefxn = core::scoring::ScoreFunctionFactory::create_score_function(std::string("score3").c_str());
     de->frag_opt.scorefxn = scorefxn;
     de->frag_opt.stage_name = std::string("stage4");
