@@ -43,7 +43,21 @@ struct Protinfo
   std::string frag_3;
   std::string frag_9;
 };
+#include <sys/types.h>
+#include <sys/stat.h>
 
+
+inline int dirExists(const char *path)
+{
+  struct stat info;
+
+  if(stat( path, &info ) != 0)
+    return 0;
+  else if(info.st_mode & S_IFDIR)
+    return 1;
+  else
+    return 0;
+}
 inline std::string read_ss2(std::string ss_file, core::pose::Pose& ipose) {
 
   core::fragment::SecondaryStructureOP ss_profile( new core::fragment::SecondaryStructure() );

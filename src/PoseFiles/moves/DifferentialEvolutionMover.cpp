@@ -138,7 +138,7 @@ void MoverDE::init_popul(std::vector<Individual>& popul) {
 }
 
 void MoverDE::apply() {
-  int gen_count = 0;
+  gen_count = 0;
   Parents parents;
   new_best_found = false;
   std::cout << "init DE for function " << scfxn->name() << std::endl;
@@ -178,7 +178,7 @@ void MoverDE::apply() {
 }
 
 void HybridMoverDE::apply() {
-  int gen_count = 0;
+  gen_count = 0;
   Parents parents;
   new_best_found = false;
   std::cout << "init Hybrid DE for function " << scfxn->name() << std::endl;
@@ -315,8 +315,12 @@ bool CrowdingMoverDE::select_population(const std::vector<Individual>& trial_pop
   double previous_best = popul[best_idx].score;
   for (int i = 0; i < trial_popul.size(); i++) {
     int nearest_ind = calculate_distances_popul->find_nearest(trial_popul[i], popul);
+    double previous_score = popul[nearest_ind].score;
     if ( trial_popul[i].score < popul[nearest_ind].score ) {
+      std::cout << "nearest ind " << nearest_ind << " ind " << i << "(" << calculate_distances_popul->distance_between_inds(trial_popul[i], popul[nearest_ind])   << ") : " << trial_popul[i].score << " " << previous_score << std::endl;
       popul[nearest_ind] = trial_popul[i];
+      int p;
+      std::cin >> p;
       new_best_found = true;
       trial_sucess_n++;
     }
@@ -347,6 +351,13 @@ bool SharedMoverDE::select_population(const std::vector<Individual>& trial_popul
   // 4. Select the best half of the population to continue in the evolution
   //     4.1. If the selected population doen't contains the best individual, then change it for the last worst individual according to its shared fitness
   std::vector<Individual> large_popul = trial_popul;
+  if (desired_gens.begin() != desired_gens.end()) {
+    if (std::find(desired_gens.begin(), desired_gens.end(), gen_count) !=
+	desired_gens.end()) {
+      FileToPDBPrinter::population_to_file(app_options, scfxn->name(),gen_count, trial_popul, FileToPDBPrinter::PrintPopulationOption::print_trial_population);
+    }
+  }
+
   large_popul.insert(large_popul.end(), popul.begin(), popul.end());
 
   double using_sf = false;
@@ -462,6 +473,8 @@ void MoverDE::print_generation_information(int gen_count, bool new_best_found) {
             FileToPDBPrinter::population_to_file(app_options, scfxn->name(),gen_count, popul);
           }
         }
+
+
     }
   }
 }
@@ -534,8 +547,8 @@ void MoverDE::select_parents(int i, Parents& parent) {
     parent.x1 = rand() % NP;
   } while (parent.x1 == i);
 
-  //  parent.x1 = best_idx;
 
+  //parent.x1 = best_idx;
   do {
     parent.x2 = rand() % NP;
   } while ((parent.x2 ==i) || (parent.x2 == parent.x1));
@@ -763,7 +776,7 @@ bool MoverDE::update_stat(int i, Individual ind, std::vector<Individual> popul) 
 }
 
 void SharedHybridMoverDE::apply() {
-  int gen_count = 0;
+  gen_count = 0;
   Parents parents;
   new_best_found = false;
   std::cout << "init Shared Hybrid DE for function " << scfxn->name() << std::endl;

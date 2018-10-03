@@ -21,6 +21,11 @@ DE_Operator::DE_Operator() {
   gmax_per_stage["stage3"] = 190;
   gmax_per_stage["stage4"] = 100000;
 
+  // gmax_per_stage["stage1"] = 30;
+  // gmax_per_stage["stage2"] = 10;
+  // gmax_per_stage["stage3"] = 190;
+  // gmax_per_stage["stage4"] = 100000;
+
   distances_map["rmsd"] = rmsd;
   distances_map["rmsd_native_diff"] = rmsd_native_diff;
   distances_map["euclidean"] = euclidean;

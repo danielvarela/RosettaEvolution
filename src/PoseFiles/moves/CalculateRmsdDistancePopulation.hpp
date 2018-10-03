@@ -73,7 +73,7 @@ public:
   void
   calculate_rmsd(const std::vector<Individual>& popul,    std::vector<double>& rmsd_to_native );
 
-  int
+  virtual int
   find_nearest(Individual target, const std::vector<Individual>& popul);
 
   std::vector<int>
@@ -210,6 +210,12 @@ public:
 
   void
   build_inter_distances_of_straight();
+
+  void
+  build_inter_distance_for_an_individual(core::pose::PoseOP pose_ind_1, std::vector<double>& inter_distance_individual_1);
+
+  int
+  find_nearest(Individual target, const std::vector<Individual>& popul);
 
   void
   build_inter_distances_of_population( const std::vector<Individual>& popul);

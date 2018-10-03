@@ -52,7 +52,8 @@ public:
   PopulComparer popul_comparer;
   boost::property_tree::ptree app_options;
   std::vector<int> desired_gens; 
-  
+  int gen_count;
+
   MoverDE();
 
   MoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population);

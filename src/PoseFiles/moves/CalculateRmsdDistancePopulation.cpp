@@ -9,6 +9,8 @@
 #include <map>
 #include <utility>
 
+#define NORM_MULTIPLIED_FACTOR 0.5f
+
 InterDistancesGraph::InterDistancesGraph() {
   for (double i = 0; i < 5; i = i + 0.1) {
     bin_values.push_back(i);
@@ -169,8 +171,6 @@ double  CalculateDistancePopulation::distance_of_individual(core::pose::PoseOP p
 
 int
 CalculateDistancePopulation::find_nearest(Individual target, const std::vector<Individual>& popul) {
-  
-
   build_pdb_population(popul, popul_pdb);
  
   int popul_size = popul.size();
@@ -180,13 +180,12 @@ CalculateDistancePopulation::find_nearest(Individual target, const std::vector<I
   int nearest_idx = 0;
   double best_found = 100000;
   for (int i = 0; i < popul_size; i++) {
-    double curr_score = current_distance_calculation(*popul_pdb[i], *pose_target);
-    if (curr_score < best_found) {
-      best_found = curr_score;
+    double curr_dist = current_distance_calculation(*popul_pdb[i], *pose_target);
+    if (curr_dist < best_found) {
+      best_found = curr_dist;
       nearest_idx = i;
     }
   }
-
   return nearest_idx;
 }
 
@@ -492,9 +491,9 @@ CalculateEuclideanMarioPartialDistancePopulation::CalculateEuclideanMarioPartial
     }
   }
 
-  for (int i = 0; i < selected_residues_for_rmsd.size(); i++) {
-    std::cout << "residue " << selected_residues_for_rmsd[i] << " " << ss[selected_residues_for_rmsd[i] - 1 ] << std::endl;
-  }
+  // for (int i = 0; i < selected_residues_for_rmsd.size(); i++) {
+  //   std::cout << "residue " << selected_residues_for_rmsd[i] << " " << ss[selected_residues_for_rmsd[i] - 1 ] << std::endl;
+  // }
 
   // int paa;
   // std::cin >> paa;
@@ -509,6 +508,11 @@ CalculateEuclideanMarioPartialDistancePopulation::build_inter_distances_of_strai
     straight->set_phi(i, 180.0);
     straight->set_psi(i, 180.0);
   }
+  int half_res = straight->total_residue() / 2;
+  core::PointPosition calpha1_pos_aux  = straight->residue(1).xyz("CA");
+  core::PointPosition calpha2_pos_aux = straight->residue(half_res).xyz("CA");
+  double max_dist = calpha1_pos_aux.distance(calpha2_pos_aux);
+
     for ( int i = 0; i < selected_residues_for_rmsd.size(); ++i)  {
       for (int j  = i + 1; j < selected_residues_for_rmsd.size(); j++) {
 	core::Size res_num_1 = core::Size(selected_residues_for_rmsd[i]);
@@ -519,7 +523,7 @@ CalculateEuclideanMarioPartialDistancePopulation::build_inter_distances_of_strai
 	// falta normalizar esta distancia dividiendo por al distancia maxima ( la misma dist para la proteina estirada)
 	//inter_distance_individual_1.push_back( std::sqrt( std::pow(dist, 2) / 2)  );
 
-	inter_dist_norm_max[std::make_pair<int, int>(res_num_1, res_num_2)] = dist ;
+	inter_dist_norm_max[std::make_pair<int, int>(res_num_1, res_num_2)] = max_dist ;
       }
     }
 }
@@ -599,44 +603,92 @@ CalculateEuclideanMarioPartialDistancePopulation::distance_of_individual_partial
 
 void
 CalculateEuclideanMarioPartialDistancePopulation::build_inter_distances_of_population( const std::vector<Individual>& popul) {
+  inter_distances_per_ind.resize(0);
   for (int i = 0; i < popul.size(); i++) {
     core::pose::PoseOP pose_ind_1, pose_ind_2;
     pose_ind_1 = pose_ind->clone();
     pfunc->fill_pose(pose_ind_1, popul[i], ss);
+    std::vector<double> inter_distance_individual;
+    build_inter_distance_for_an_individual(pose_ind_1, inter_distance_individual);
+    inter_distances_per_ind.push_back(inter_distance_individual);
+    // std::cout << "inter_ind " << i << " : ";
+    // for (int d = 0; d < inter_distance_individual_1.size(); d++) {
+    //   std::cout << inter_distance_individual_1[d] << " , ";
+    // }
+    // std::cout << std::endl;
+  }
+}
 
-    std::vector<double> inter_distance_individual_1;
-    for ( int i = 0; i < selected_residues_for_rmsd.size(); ++i)  {
-      for (int j  = i + 1; j < selected_residues_for_rmsd.size(); j++) {
-	core::Size res_num_1 = core::Size(selected_residues_for_rmsd[i]);
-	core::Size res_num_2 = core::Size(selected_residues_for_rmsd[j]);
-	core::PointPosition calpha1_pos  = pose_ind_1->residue(res_num_1).xyz("CA");
-	core::PointPosition calpha2_pos = pose_ind_1->residue(res_num_2).xyz("CA");
-	double dist = calpha1_pos.distance(calpha2_pos);
-	// falta normalizar esta distancia dividiendo por al distancia maxima ( la misma dist para la proteina estirada)
-	//inter_distance_individual_1.push_back( std::sqrt( std::pow(dist, 2) / 2)  );
-	if (inter_dist_norm_max[std::pair<int, int>(res_num_1, res_num_2)] == 0) {
-	  inter_distance_individual_1.push_back(0);
-	} else {
-	  double normalized_dist = dist / inter_dist_norm_max[std::pair<int, int>(res_num_1, res_num_2)];
-	  //	  std::cout << " dist " << dist << " norm " << normalized_dist << " max " << inter_dist_norm_max[std::pair<int, int>(res_num_1, res_num_2)] << std::endl;
-	  inter_distance_individual_1.push_back( normalized_dist );
-	}
+void
+CalculateEuclideanMarioPartialDistancePopulation::build_inter_distance_for_an_individual(core::pose::PoseOP pose_ind, std::vector<double>& inter_distance_individual) {
+  inter_distance_individual.resize(0);
+  for ( int i = 0; i < selected_residues_for_rmsd.size(); ++i)  {
+    for (int j  = i + 1; j < selected_residues_for_rmsd.size(); j++) {
+      core::Size res_num_1 = core::Size(selected_residues_for_rmsd[i]);
+      core::Size res_num_2 = core::Size(selected_residues_for_rmsd[j]);
+      core::PointPosition calpha1_pos  = pose_ind->residue(res_num_1).xyz("CA");
+      core::PointPosition calpha2_pos = pose_ind->residue(res_num_2).xyz("CA");
+      double dist = calpha1_pos.distance(calpha2_pos);
+      // normalizar esta distancia dividiendo por al distancia maxima ( la misma dist para la proteina estirada)
+      //inter_distance_individual.push_back( std::sqrt( std::pow(dist, 2) / 2)  );
+      if (inter_dist_norm_max[std::pair<int, int>(res_num_1, res_num_2)] == 0) {
+	inter_distance_individual.push_back(0);
+      } else {
+	double normalized_dist = dist / ( NORM_MULTIPLIED_FACTOR * inter_dist_norm_max[std::pair<int, int>(res_num_1, res_num_2)] );
+	//	  std::cout << " dist " << dist << " norm " << normalized_dist << " max " << inter_dist_norm_max[std::pair<int, int>(res_num_1, res_num_2)] << std::endl;
+	inter_distance_individual.push_back( normalized_dist );
       }
     }
-
-    inter_distances_per_ind.push_back(inter_distance_individual_1);
   }
+}
+
+int
+CalculateEuclideanMarioPartialDistancePopulation::find_nearest(Individual target, const std::vector<Individual>& popul) {
+  build_pdb_population(popul, popul_pdb);
+  build_inter_distances_of_population(popul);
+
+  int popul_size = popul.size();
+  core::pose::PoseOP pose_target = pose_ind->clone();
+  pfunc->fill_pose(pose_target, target, ss);
+
+  std::vector<double> inter_distance_target;
+  build_inter_distance_for_an_individual(pose_target, inter_distance_target);
+
+  int nearest_idx = 0;
+  double best_found = 100000;
+  inter_distance_individual_1 = inter_distance_target;
+  // std::cout << "find_nearest " << std::endl;
+  for (int i = 0; i < popul_size; i++) {
+    inter_distance_individual_2 = inter_distances_per_ind[i];
+    double curr_dist = current_distance_calculation(*popul_pdb[i], *pose_target);
+    // std::cout << i << " : " << curr_dist << std::endl;
+    if (curr_dist < best_found) {
+      best_found = curr_dist;
+      nearest_idx = i;
+    }
+  }
+
+  // std::cout<< "found at " << nearest_idx << " dist " << best_found << std::endl;
+
+  return nearest_idx;
 }
 
 double
 CalculateEuclideanMarioPartialDistancePopulation::current_distance_calculation(core::pose::Pose& pose_1, core::pose::Pose& pose_2) {
   double sum = 0.0;
+  // std::cout << "number of distances " << inter_distance_individual_1.size() << std::endl;
   for ( int i = 0; i < inter_distance_individual_1.size(); ++i)  {
     sum += std::pow( inter_distance_individual_1[i] - inter_distance_individual_2[i], 2);
+    // std::cout << inter_distance_individual_1[i] << " - " << inter_distance_individual_2[i] << std::endl;
+    // std::cout << "acum: " << sum << std::endl;
   }
 
   double result = std::sqrt(sum);
   result = result / inter_distance_individual_1.size();
+  // std::cout << "final result after sqrt and norm " << result << std::endl;
+  // int p;
+  // std::cin >> p;
+
   return result;
 }
 

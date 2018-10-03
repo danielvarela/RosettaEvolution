@@ -52,7 +52,6 @@ StageRosettaSampler::apply(core::pose::Pose& pose_, FuncStats& stats) {
 void
 StageRosettaSampler::apply( core::pose::Pose &pose ) {
   using namespace protocols::moves;
-
   if (rosetta_stage == "stage2") {
     stage2_cycles_ = 50;
     prepare_stage2( pose );
@@ -76,7 +75,6 @@ StageRosettaSampler::apply( core::pose::Pose &pose ) {
     recover_low( pose , STAGE_4 );
     mc().reset_counters();
   }
-
 }
 
 
@@ -293,8 +291,8 @@ StageRosettaMover::apply(core::pose::Pose& pose_) {
 void
 NoGreedyStageRosettaMover::apply(core::pose::Pose& pose_) {
   core::pose::Pose pose_backup = pose_;
-  double init_score = (*sfxn)(pose_);
+  (*sfxn)(pose_);
   sampler->init(pose_);
   sampler->apply(pose_);
-  double final_score = (*sfxn)(pose_);
+  (*sfxn)(pose_);
 }
