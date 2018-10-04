@@ -37,6 +37,7 @@ DE_Operator::DE_Operator() {
   protocol_name_map["Shared"] = Shared;
   protocol_name_map["HybridShared"] = HybridShared;
   protocol_name_map["CrowdingDE"] = CrowdingDE;
+  protocol_name_map["HybridCrowdingDE"] = HybridCrowdingDE;
 
   init_popul_strategy_map["total_random"] = total_random;
   init_popul_strategy_map["random_pose_based"] = random_pose_based;
@@ -218,7 +219,8 @@ DE_Operator::prepare_stage(std::string stage_name) {
   }
 
 
-   if (app_options.get<std::string>("Protocol.name") =="HybridShared") {
+   if ( (app_options.get<std::string>("Protocol.name") =="HybridShared") ||
+	(app_options.get<std::string>("Protocol.name") =="HybridCrowdingDE")) {
      bool fragment_at_popul = false;
      boost::property_tree::ptree::const_assoc_iterator it = app_options.find("Fragments.strategy_at_population");
      if(app_options.not_found() == it) {
@@ -228,7 +230,7 @@ DE_Operator::prepare_stage(std::string stage_name) {
        //default option
        initialize_local_search_to_apply_at_population(std::string("stage_rosetta_mover"));
      }
-  }
+   }
 
 
   ffxn->name_ = std::string("Score Function for stage " + stage_name);
@@ -372,6 +374,10 @@ DE_Operator::init_differential_evolution_protocol() {
   }
   case CrowdingDE: {
     de = boost::shared_ptr<MoverDE>(new CrowdingMoverDE(app_options, ffxn, current_population));
+    break;
+  }
+  case HybridCrowdingDE: {
+    de = boost::shared_ptr<MoverDE>(new CrowdingHybridMoverDE(app_options, ffxn, current_population, local_search));
     break;
   }
 default:

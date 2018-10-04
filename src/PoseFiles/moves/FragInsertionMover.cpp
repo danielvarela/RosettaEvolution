@@ -120,8 +120,7 @@ FragInsertionMover::apply(core::pose::Pose& pose_, FuncStats& stats) {
   double init_score = (*sfxn)(pose_);
   double current_score;
   int cnt = 0;
-  do
-    {
+  do {
       frag_mover->apply(inner_pose);
       current_score = (*sfxn)(inner_pose);
       if (stats.find("total_tries") != stats.end()) {
@@ -144,7 +143,7 @@ FragInsertionMover::apply(core::pose::Pose& pose_, FuncStats& stats) {
       }
 
       cnt++;
-    } while (cnt < 100);
+    } while (cnt < 50);
 }
 
 void
@@ -153,8 +152,7 @@ FragInsertionMover::apply(core::pose::Pose& pose_) {
   double init_score = (*sfxn)(pose_);
   double current_score;
   int cnt = 0;
-  do
-    {
+  do  {
       frag_mover->apply(inner_pose);
       current_score = (*sfxn)(inner_pose);
       if (current_score < init_score) {

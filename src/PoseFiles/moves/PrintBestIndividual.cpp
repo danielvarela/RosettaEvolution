@@ -15,9 +15,14 @@ PrintBestIndividual::PrintBestIndividual(const core::pose::PoseOP& p , FitFuncti
 
 std::string
 PrintBestIndividual::print(Individual ind) {
+ return print(ind, std::to_string(uniq_id) + "_" + std::to_string(cnt) );
+}
+
+std::string
+PrintBestIndividual::print(Individual ind, std::string id) {
   boost::shared_ptr<PoseFunction> pfunc = boost::dynamic_pointer_cast<PoseFunction >(scorefxn);
   pfunc->fill_pose(pose_, ind, ss);
-  std::string path = "/home/dvarela/Code/RosettaEvolution/output_pdbs/best_ind_" + std::to_string(uniq_id) +"_"+ std::to_string(cnt) +"_.pdb";
+  std::string path = "/home/dvarela/Code/RosettaEvolution/output_pdbs/best_ind_" + id +"_.pdb";
   pose_->dump_pdb(path.c_str());
 
   double rmsd_vs_previous_best = 0;

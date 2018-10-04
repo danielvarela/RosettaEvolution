@@ -29,6 +29,9 @@ public:
   print(Individual ind);
 
   std::string
+  print(Individual ind, std::string id);
+
+  std::string
   print_energies(Individual ind);
 
 };

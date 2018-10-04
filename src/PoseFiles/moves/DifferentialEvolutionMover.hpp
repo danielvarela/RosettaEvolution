@@ -53,6 +53,7 @@ public:
   boost::property_tree::ptree app_options;
   std::vector<int> desired_gens; 
   int gen_count;
+  std::string id;
 
   MoverDE();
 

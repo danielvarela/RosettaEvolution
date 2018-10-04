@@ -28,6 +28,8 @@ MoverDE::MoverDE() {
   scfxn = boost::shared_ptr<FitFunction>(new ToyFunction());
   init_popul_ = boost::shared_ptr<InitPopulation>(new InitPopulation(scfxn));
 
+  id = std::to_string( static_cast<int>(std::abs(rand())) );
+
   NP = 100;
   Gmax = 100;
   D = scfxn->D();
@@ -45,6 +47,8 @@ MoverDE::MoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, std::vector<Indivi
   srand(time(NULL));
   use_print_class = false;
   scfxn = scfxn_in;
+  id = std::to_string( static_cast<int>(std::abs(rand())) );
+
   //  init_popul_ = init_popul_in;
 
   NP = pt.NP;
@@ -139,6 +143,8 @@ void MoverDE::init_popul(std::vector<Individual>& popul) {
 
 void MoverDE::apply() {
   gen_count = 0;
+
+  id = std::to_string( static_cast<int>(std::abs(rand())) );
   Parents parents;
   new_best_found = false;
   std::cout << "init DE for function " << scfxn->name() << std::endl;
@@ -151,9 +157,8 @@ void MoverDE::apply() {
      // #pragma omp parallel
     // #pragma omp for
     for (int i = 0; i < NP; ++i) {
-      score(popul[i]);
+      //      score(popul[i]);
       select_parents(i, parents);
-
       Individual ind = sample_new_individual(i, parents, popul);
       trial_popul.push_back(ind);
     }
@@ -179,6 +184,7 @@ void MoverDE::apply() {
 
 void HybridMoverDE::apply() {
   gen_count = 0;
+  id = std::to_string( static_cast<int>(std::abs(rand())) );
   Parents parents;
   new_best_found = false;
   std::cout << "init Hybrid DE for function " << scfxn->name() << std::endl;
@@ -223,7 +229,6 @@ void HybridMoverDE::apply() {
 
     std::cout << "[RMSD_TRIALS] GEN " << gen_count << " { " << global_min_rmsd << " , " << global_max_rmsd << " } " << global_avg_rmsd / NP << std::endl;
 
-    std::cout << "[TRIAL_0] " << "total " << trial_popul[0].score << " " << print_best_ind->print_energies(trial_popul[0]) << std::endl;
     new_best_found = select_population(trial_popul);
 
     print_generation_information(gen_count, new_best_found);
@@ -279,7 +284,10 @@ bool CrowdingHybridMoverDE::select_population(const std::vector<Individual>& tri
   }
 
   avg_acc = 0;
+  best_idx = 0;
+  //  std::cout << "check_popul ";
   for (int i = 0; i < popul.size(); i++) {
+    //std::cout << (-1 * SCORE_ERROR_FIXED) + popul[i].score << " ( "<< popul[i].score << " ) ";
     avg_acc += popul[i].score;
     if (popul[i].score < popul[best_idx].score) {
       best_idx = i;
@@ -289,6 +297,10 @@ bool CrowdingHybridMoverDE::select_population(const std::vector<Individual>& tri
       }
     }
   }
+  //std::cout << std::endl;
+  //std::cout << "best " << (-1 * SCORE_ERROR_FIXED) + best << " at " << best_idx << " " << popul[best_idx].score << std::endl;
+
+  copy_popul_fitness_for_print = popul;
 
   return new_best_found;
 }
@@ -309,27 +321,30 @@ void CrowdingMoverDE::print_fitness_population(int gen_count) {
 bool CrowdingMoverDE::select_population(const std::vector<Individual>& trial_popul) {
   trial_sucess_n = 0;
   // Crowding DE: Rene Thomsen Algorithm
-  // 1. Each trial can be replace only its nearest individual if the energy is better
 
   bool new_best_found = false;
   double previous_best = popul[best_idx].score;
+
   for (int i = 0; i < trial_popul.size(); i++) {
     int nearest_ind = calculate_distances_popul->find_nearest(trial_popul[i], popul);
     double previous_score = popul[nearest_ind].score;
     if ( trial_popul[i].score < popul[nearest_ind].score ) {
-      std::cout << "nearest ind " << nearest_ind << " ind " << i << "(" << calculate_distances_popul->distance_between_inds(trial_popul[i], popul[nearest_ind])   << ") : " << trial_popul[i].score << " " << previous_score << std::endl;
+      //      std::cout << "nearest ind " << nearest_ind << " ind " << i << "(" << calculate_distances_popul->distance_between_inds(trial_popul[i], popul[nearest_ind])   << ") : " << trial_popul[i].score << " " << previous_score << std::endl;
       popul[nearest_ind] = trial_popul[i];
-      int p;
-      std::cin >> p;
+      // int p;
+      // std::cin >> p;
       new_best_found = true;
       trial_sucess_n++;
     }
   }
 
   avg_acc = 0;
+  best_idx = 0;
+  std::cout << "check_popul " ;
   for (int i = 0; i < popul.size(); i++) {
+    std::cout <<  (-1 * SCORE_ERROR_FIXED) + popul[i].score << " ";
     avg_acc += popul[i].score;
-    if (popul[i].score < popul[best_idx].score) {
+    if (popul[i].score < popul[best_idx].score ) {
       best_idx = i;
       best = popul[best_idx].score;
       if (best < previous_best) {
@@ -337,6 +352,10 @@ bool CrowdingMoverDE::select_population(const std::vector<Individual>& trial_pop
       }
     }
   }
+  std::cout << std::endl;
+  std::cout << "best " << best << " at " << best_idx << " " << popul[best_idx].score << std::endl;
+  // std::string str_best_found = (new_best_found) ? "SI" : "NO";
+  // std::cout << "best " << (-1 * SCORE_ERROR_FIXED) + best  << " idx " << best_idx << " previous " << previous_best << " " << str_best_found << std::endl;
 
   return new_best_found;
 }
@@ -536,7 +555,7 @@ Individual MoverDE::sample_new_individual(int i, const Parents& p, std::vector<I
   trial.omega = popul[p.x1].omega;
   trial.ss = popul[p.x1].ss;
 
-  score(trial);
+  //  score(trial);
   return trial;
 }
 
@@ -616,6 +635,8 @@ void SharedMoverDE::print_fitness_population(int gen_count) {
       std::cout << (-1 * SCORE_ERROR_FIXED) + copy_popul_fitness_for_print[i].score << " ";
     }
     std::cout << std::endl;
+    // int p;
+    // std::cin >> p;
   }
 }
 
@@ -735,7 +756,8 @@ void MoverDE::print_individual_information(int gen_count, bool new_best_found) {
   }
 
   if (use_print_class) {
-    if ((new_best_found) || (gen_count == 0)) {
+    //if ((new_best_found) || (gen_count == 0)) {
+    if ( (gen_count % 10) == 0  ) {
       double perc_of_diff = 0;
       for (int i = 0; i < D; i++) {
 	if (std::abs(popul[ind_index].vars[i] - current_best_ind.vars[i]) > 0.013) {
@@ -747,7 +769,8 @@ void MoverDE::print_individual_information(int gen_count, bool new_best_found) {
       }
       current_best_ind = popul[ind_index];
 
-      std::string url_best = print_best_ind->print(popul[ind_index]);
+
+      std::string url_best = print_best_ind->print(popul[ind_index], id);
       std::cout << "[IND] " << gen_count << " " << (-1 * SCORE_ERROR_FIXED) + popul[ind_index].score << " " << perc_of_diff << " " << url_best << std::endl;
       std::cout << "[ENERGY] " << print_best_ind->print_energies(popul[ind_index]) << std::endl;
     }
@@ -777,6 +800,7 @@ bool MoverDE::update_stat(int i, Individual ind, std::vector<Individual> popul) 
 
 void SharedHybridMoverDE::apply() {
   gen_count = 0;
+  id = std::to_string( static_cast<int>(std::abs(rand())) );
   Parents parents;
   new_best_found = false;
   std::cout << "init Shared Hybrid DE for function " << scfxn->name() << std::endl;
@@ -795,45 +819,46 @@ void SharedHybridMoverDE::apply() {
 
     //    LocalSearchIndividualMover prt_local_search = *local_search.get();
 
-    //    #pragma omp parallel for shared(prt_local_search)
+#pragma omp parallel for  num_threads(3)
     for (int i = 0; i < NP; ++i) {
-      //      std::cout<<"threads="<<omp_get_num_threads()<<std::endl;
-      // apparently it disturbs the right score of the population
-      //prt_local_search.apply(popul[i]);
-       local_search->apply(popul[i]);
+#pragma omp critical
+      local_search->apply(popul[i]);
     }
 
     for (int i = 0; i < NP; ++i) {
       select_parents(i, parents);
-
       Individual ind = sample_new_individual(i, parents, popul);
-      diff_avg_bef = (diff_avg_bef / D);
-      diff_avg_aft = (diff_avg_aft / D);
-      total_diff_avg_bef += diff_avg_bef;
-      total_diff_avg_aft += diff_avg_aft;
-      if (CR > 0.5) {
-	double new_rmsd = calculate_distances_popul->distance_between_inds(ind, popul[parents.x1]);
-	//	std::cout << "rmsd parent " << i << " " << new_rmsd << std::endl;
-	if (new_rmsd > global_max_rmsd) {
-	  global_max_rmsd = new_rmsd;
-	}
-	if (new_rmsd < global_min_rmsd) {
-	  global_min_rmsd = new_rmsd;
-	}
-	global_avg_rmsd += new_rmsd;
-      } else {
-	double new_rmsd = calculate_distances_popul->distance_between_inds(ind, popul[i]);
-	std::cout << "rmsd parent " << i << " " << new_rmsd << std::endl;
-      }
-
+      // diff_avg_bef = (diff_avg_bef / D);
+      // diff_avg_aft = (diff_avg_aft / D);
+      // total_diff_avg_bef += diff_avg_bef;
+      // total_diff_avg_aft += diff_avg_aft;
+      // if (CR > 0.5) {
+      // 	double new_rmsd = calculate_distances_popul->distance_between_inds(ind, popul[parents.x1]);
+      // 	//	std::cout << "rmsd parent " << i << " " << new_rmsd << std::endl;
+      // 	if (new_rmsd > global_max_rmsd) {
+      // 	  global_max_rmsd = new_rmsd;
+      // 	}
+      // 	if (new_rmsd < global_min_rmsd) {
+      // 	  global_min_rmsd = new_rmsd;
+      // 	}
+      // 	global_avg_rmsd += new_rmsd;
+      // } else {
+      // 	double new_rmsd = calculate_distances_popul->distance_between_inds(ind, popul[i]);
+      // 	std::cout << "rmsd parent " << i << " " << new_rmsd << std::endl;
+      // }
       trial_popul.push_back(ind);
     }
 
-    std::cout << "[DIFF_AVG] " << (total_diff_avg_bef / NP) << " "  << (total_diff_avg_aft / NP) << std::endl;
+#pragma omp parallel for  num_threads(3)
+    for (int i = 0; i < NP; ++i) {
+#pragma omp critical
+      score(trial_popul[i]);
+    }
 
-    std::cout << "[RMSD_TRIALS] GEN " << gen_count << " { " << global_min_rmsd << " , " << global_max_rmsd << " } " << global_avg_rmsd / NP << std::endl;
+    // std::cout << "[DIFF_AVG] " << (total_diff_avg_bef / NP) << " "  << (total_diff_avg_aft / NP) << std::endl;
 
-    std::cout << "[TRIAL_0] " << "total " << trial_popul[0].score << " " << print_best_ind->print_energies(trial_popul[0]) << std::endl;
+    // std::cout << "[RMSD_TRIALS] GEN " << gen_count << " { " << global_min_rmsd << " , " << global_max_rmsd << " } " << global_avg_rmsd / NP << std::endl;
+
     new_best_found = select_population(trial_popul);
 
     print_generation_information(gen_count, new_best_found);

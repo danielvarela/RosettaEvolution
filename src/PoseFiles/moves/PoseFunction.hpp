@@ -36,8 +36,9 @@ public:
   }
 
   virtual double score(Individual& ind) override {
-    fill_pose(pose_, ind, ss);
-    double result = (*scorefxn)(*pose_);
+    core::pose::PoseOP inner_pose = pose_->clone();
+    fill_pose(inner_pose, ind, ss);
+    double result = (*scorefxn)(*inner_pose);
     ind.score = result;
     return result;
   }
@@ -158,27 +159,29 @@ public:
   }
 
 
-  void pose_to_ind(core::pose::PoseOP pose_, Individual& ind) {
+  void pose_to_ind(core::pose::PoseOP inner_pose_, Individual& ind) {
     int ind_size = D_;
     int nres = 1;
-    for (int j = 0; nres <= pose_->total_residue(); j = j+2) {
-      ind.vars[j] = scale(pose_->phi(nres));
-      ind.vars[j + 1] = scale(pose_->psi(nres));
-      ind.omega[nres - 1] = pose_->omega(nres);
+    for (int j = 0; nres <= inner_pose_->total_residue(); j = j+2) {
+      ind.vars[j] = scale(inner_pose_->phi(nres));
+      ind.vars[j + 1] = scale(inner_pose_->psi(nres));
+      ind.omega[nres - 1] = inner_pose_->omega(nres);
       nres++;
     }
-    ind.ss = pose_->secstruct();
+    ind.ss = inner_pose_->secstruct();
   }
 
   double score(Individual& ind) override {
-    fill_pose(pose_, ind, ss);
-    double result = SCORE_ERROR_FIXED + (*scorefxn)(*pose_);
+    core::pose::PoseOP inner_pose = pose_->clone();
+    fill_pose(inner_pose, ind, ss);
+    double result = SCORE_ERROR_FIXED + (*scorefxn)(*inner_pose);
     ind.score = result;
     return result;
    }
 
   double apply_fragment_stage(Individual& ind) {
-   }
+    return ind.score;
+  }
 
   double run_frag_mover(core::pose::Pose& pose) {
     frag_mover->apply(pose);
@@ -252,16 +255,16 @@ public:
   }
 
 
-  void pose_to_ind(core::pose::PoseOP pose_, Individual& ind) {
+  void pose_to_ind(core::pose::PoseOP inner_pose_, Individual& ind) {
     int ind_size = D_;
     int nres = 1;
-    for (int j = 0; nres <= pose_->total_residue(); j = j+2) {
-      ind.vars[j] = scale(pose_->phi(nres));
-      ind.vars[j + 1] = scale(pose_->psi(nres));
-      ind.omega[nres - 1] = pose_->omega(nres);
+    for (int j = 0; nres <= inner_pose_->total_residue(); j = j+2) {
+      ind.vars[j] = scale(inner_pose_->phi(nres));
+      ind.vars[j + 1] = scale(inner_pose_->psi(nres));
+      ind.omega[nres - 1] = inner_pose_->omega(nres);
       nres++;
     }
-    ind.ss = pose_->secstruct();
+    ind.ss = inner_pose_->secstruct();
   }
 
   double score(Individual& ind) override {
@@ -269,13 +272,14 @@ public:
   }
 
   double apply_fragment_stage(Individual& ind) {
-    fill_pose(pose_, ind, ss);
-    double result = SCORE_ERROR_FIXED + (*scorefxn)(*pose_);
+    core::pose::PoseOP inner_pose = pose_->clone();
+    fill_pose(inner_pose, ind, ss);
+    double result = SCORE_ERROR_FIXED + (*scorefxn)(*inner_pose);
     ind.score = result;
-    core::pose::PoseOP pose_backup = pose_->clone();
-    double result_after_frags = run_frag_mover(*pose_);
+    core::pose::PoseOP pose_backup = inner_pose->clone();
+    double result_after_frags = run_frag_mover(*inner_pose);
     if (result_after_frags < result) {
-      pose_to_ind(pose_, ind);
+      pose_to_ind(inner_pose, ind);
       result = result_after_frags;
 
       if (stats.find("improved_after_de") != stats.end()) {
