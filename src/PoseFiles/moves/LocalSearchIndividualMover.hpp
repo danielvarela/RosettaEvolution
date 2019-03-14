@@ -21,6 +21,8 @@ class LocalSearchIndividualMover : public PoseFragmentFunction
 {
 public:
 
+  LocalSearchIndividualMover() {}
+
   LocalSearchIndividualMover(core::pose::PoseOP p, core::scoring::ScoreFunctionOP sfxn, std::string ss_in, FragInsertionMoverPtr frag_mover_) :   PoseFragmentFunction(p, sfxn, ss_in, frag_mover_) {
     frag_mover = frag_mover_;
   }
@@ -34,28 +36,22 @@ public:
   }
 
   std::string print_stats() override {
-
-
     int total_improves = 0;
-    if (stats.find("improved_after_LS") != stats.end()) {
-      total_improves = stats["improved_after_LS"];
-    } else {
-      total_improves = 0;
-    }
+    total_improves = static_cast<int>(stats.obtain("improved_after_LS"));
+
     std::string output_string = "[LS_IMPROVED] " + std::to_string(total_improves);
     if (total_improves > 0) {
-      output_string += " amt_improves " + std::to_string( stats["improved_amt_LS"] / stats["improved_after_LS"] );
+      output_string += " amt_improves " + std::to_string( stats.obtain("improved_amt_LS") );
       } else {
       output_string += " amt_improves 0";
     }
 
-    if (stats.find("total_tries_LS") != stats.end()) {
-      output_string += " total_tries " + std::to_string(stats["total_tries_LS"]);
-    }
-    if (stats.find("accepted_fragments_LS") != stats.end()) {
-      output_string += " accepted_fragments " + std::to_string(stats["accepted_fragments_LS"]);
-    }
 
+    if (stats.obtain("total_tries_LS") > 0.0001)
+      output_string += " total_tries " + std::to_string(stats.obtain("total_tries_LS") );
+
+    if (stats.obtain("accepted_fragments_LS") > 0.001)
+      output_string += " accepted_fragments " + std::to_string(stats.obtain("accepted_fragments_LS"));
 
     return output_string;
   }
@@ -68,35 +64,23 @@ public:
     pose_to_ind(pose_, ind);
     ind.score = result;
     double result_after_frags = run_frag_mover(*pose_);
-    if (result_after_frags < result) {
+
+    if (std::abs(result_after_frags - result) > 0.0001) {
       //from pose to ind
       pose_to_ind(pose_, ind);
       ind.score = result_after_frags;
+      stats.increment("improved_after_LS");
+      stats.record("improved_amt_LS",  std::abs( result_after_frags - result ) );
       result = result_after_frags;
-      if (stats.find("improved_after_LS") != stats.end()) {
-	stats["improved_after_LS"]++;
-
-	stats["improved_amt_LS"] += ( result_after_frags - result );
-      } else {
-	stats["improved_after_LS"] = 1;
-	stats["improved_amt_LS"] = 0;
-      }
     }
 
-    if (stats.find("total_tries") != stats.end()) {
-      if (stats.find("total_tries_LS") == stats.end()) {
-	stats["total_tries_LS"] = 0;
-      }
-      stats["total_tries_LS"] += stats["total_tries"];
-      stats.erase("total_tries");
-    }
+    stats.record("total_tries_LS", stats.obtain("total_tries") );
+    stats.erase("total_tries");
 
-    if (stats.find("accepted_fragments") != stats.end()) {
-      stats["accepted_fragments_LS"] = stats["accepted_fragments"];
-      stats.erase("accepted_fragments");
-    }
+    stats.record("accepted_fragments_LS", stats.obtain("accepted_fragments") );
+    stats.erase("accepted_fragments");
 
-    return result;
+   return result;
   }
 };
 

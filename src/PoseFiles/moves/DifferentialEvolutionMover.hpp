@@ -16,6 +16,10 @@
 #include "PrintBestIndividual.hpp"
 #include "CalculateRmsdDistancePopulation.hpp"
 #include "LocalSearchIndividualMover.hpp"
+#if(MPI_ENABLED)
+#include "../../mpi_files/MasterRosettaCalculator.hpp"
+#endif
+
 
 class PopulComparer {
 public:
@@ -44,6 +48,7 @@ class MoverDE
 public:
   PrintBestIndividualPtr print_best_ind;
   CalculateDistancePopulationPtr calculate_distances_popul;
+  boost::shared_ptr<PartialRMSDcalculator> calculator_partial_rmsd;
   bool use_print_class;
   bool new_best_found;
   Individual current_best_ind;
@@ -53,7 +58,18 @@ public:
   boost::property_tree::ptree app_options;
   std::vector<int> desired_gens; 
   int gen_count;
+  int clean_inds_gen_limit;
+  int local_search_popul_module;
   std::string id;
+  std::string mutation_strategy;
+  std::string crossover_strategy;
+  std::string select_parents_strategy;
+  std::vector<core::pose::PoseOP> popul_pdb;
+
+
+#if(MPI_ENABLED)
+  boost::shared_ptr<MasterRosettaCalculator> mpi_calculator;
+#endif
 
   MoverDE();
 
@@ -65,7 +81,9 @@ public:
   void set_scfxn(FitFunctionPtr scfxn_in);
 
   void init_popul(std::vector<Individual>& popul);
+  int get_best_rand_ind(int target, std::string select_parents_strategy);
 
+  int get_single_point_crossover(std::string ss);
 
   virtual bool select_population(const std::vector<Individual>& trial_popul);
 
@@ -73,13 +91,15 @@ public:
 
   virtual void apply();
 
+  void apply(std::vector<Individual>& popul_in, int NP_in, int Gmax_in);
+
   void reset_stat();
 
   bool update_stat(int i, Individual ind, std::vector<Individual> popul);
 
-  double score(Individual& ind);
+  virtual double score(Individual& ind);
 
-  Individual sample_new_individual(int i, const Parents& p, std::vector<Individual> popul);
+  virtual  Individual sample_new_individual(int i, const Parents& p, std::vector<Individual> popul);
 
   int size();
 
@@ -185,6 +205,7 @@ public:
     local_search = local_search_in;
   }
 
+  void apply_local_search_at_population();
 
   void apply();
 
@@ -207,8 +228,10 @@ public:
     local_search = local_search_in;
   }
 
+  void apply_local_search_at_population();
 
   void apply();
+  double score(Individual& ind);
 
   void local_search_apply(Individual& ind) {
     local_search->apply(ind);
@@ -225,8 +248,6 @@ public:
   bool select_population(const std::vector<Individual>& trial_popul);
 
   void print_fitness_population(int gen_count);
-
-  void select_parents(int i, Parents& parent);
 };
 
 
@@ -235,6 +256,7 @@ class CrowdingHybridMoverDE : public SharedHybridMoverDE
 public:
   std::vector<double> shared_fitness, rmsd_to_native,   ind_inter_distance;
   boost::shared_ptr<LocalSearchIndividualMover> local_search;
+  double current_cde_radius;
 
   CrowdingHybridMoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population,  boost::shared_ptr<LocalSearchIndividualMover> local_search_in) : SharedHybridMoverDE(pt, scfxn_in, initial_population, local_search_in) {
     local_search = local_search_in;
@@ -245,11 +267,106 @@ public:
 
 
   bool select_population(const std::vector<Individual>& trial_popul);
+  void print_distances_population();
 
-
-  void select_parents(int i, Parents& parent);
+  void print_fitness_population(int gen_count);
 };
 
+
+class ResetOldIndsHybridDE : public HybridMoverDE
+{
+public:
+  boost::shared_ptr<LocalSearchIndividualMover> local_search;
+  boost::shared_ptr<LocalSearchIndividualMover> greedy_mover;
+  std::vector<Individual> old_population;
+
+  ResetOldIndsHybridDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population,  boost::shared_ptr<LocalSearchIndividualMover> local_search_in, boost::shared_ptr<LocalSearchIndividualMover> greedy_mover_in ) : HybridMoverDE(pt, scfxn_in, initial_population, local_search_in) {
+    local_search = local_search_in;
+    greedy_mover = greedy_mover_in;
+  }
+
+  ResetOldIndsHybridDE(boost::property_tree::ptree options, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population,  boost::shared_ptr<LocalSearchIndividualMover> local_search_in, boost::shared_ptr<LocalSearchIndividualMover> greedy_mover_in) : HybridMoverDE(options, scfxn_in, initial_population, local_search_in) {
+    greedy_mover = greedy_mover_in;
+    local_search = local_search_in;
+  }
+  void apply();
+  bool select_population(const std::vector<Individual>& trial_popul);
+  void clean_old_inds();
+};
+
+class ResetOldIndsCrowdingHybridDE : public ResetOldIndsHybridDE
+{
+public:
+  ResetOldIndsCrowdingHybridDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population,  boost::shared_ptr<LocalSearchIndividualMover> local_search_in, boost::shared_ptr<LocalSearchIndividualMover> greedy_mover_in ) : ResetOldIndsHybridDE(pt, scfxn_in, initial_population, local_search_in, greedy_mover_in) {
+  }
+  ResetOldIndsCrowdingHybridDE(boost::property_tree::ptree options, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population,  boost::shared_ptr<LocalSearchIndividualMover> local_search_in, boost::shared_ptr<LocalSearchIndividualMover> greedy_mover_in) : ResetOldIndsHybridDE(options, scfxn_in, initial_population, local_search_in, greedy_mover_in) {
+  }
+  bool select_population(const std::vector<Individual>& trial_popul);
+};
+
+
+#if(MPI_ENABLED)
+
+class MPICrowdingMoverDE : public CrowdingHybridMoverDE
+{
+public:
+
+  boost::shared_ptr<LocalSearchIndividualMover> local_search;
+  MPICrowdingMoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population,  boost::shared_ptr<LocalSearchIndividualMover> local_search_in) : CrowdingHybridMoverDE(pt, scfxn_in, initial_population, local_search_in) {
+    local_search = local_search_in;
+    mpi_calculator = boost::shared_ptr<MasterRosettaCalculator>(new MasterRosettaCalculator(scfxn_in));
+  }
+  MPICrowdingMoverDE(boost::property_tree::ptree options, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population,  boost::shared_ptr<LocalSearchIndividualMover> local_search_in) : CrowdingHybridMoverDE(options, scfxn_in, initial_population, local_search_in) {
+    local_search = local_search_in;
+    mpi_calculator = boost::shared_ptr<MasterRosettaCalculator>(new MasterRosettaCalculator(scfxn_in));
+  }
+
+  double score(Individual& ind);
+  void apply_local_search_at_population();
+  void analysis_of_population(std::vector<Individual> popul, std::vector<core::pose::PoseOP> popul_pdb);
+
+  void apply();
+};
+
+class MPISeedsMoverDE : public MPICrowdingMoverDE
+{
+public:
+
+  boost::shared_ptr<LocalSearchIndividualMover> local_search;
+  MPISeedsMoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population,  boost::shared_ptr<LocalSearchIndividualMover> local_search_in) : MPICrowdingMoverDE(pt, scfxn_in, initial_population, local_search_in) {
+    local_search = local_search_in;
+    mpi_calculator = boost::shared_ptr<MasterRosettaCalculator>(new MasterRosettaCalculator(scfxn_in));
+  }
+  MPISeedsMoverDE(boost::property_tree::ptree options, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population,  boost::shared_ptr<LocalSearchIndividualMover> local_search_in) : MPICrowdingMoverDE(options, scfxn_in, initial_population, local_search_in) {
+    local_search = local_search_in;
+    mpi_calculator = boost::shared_ptr<MasterRosettaCalculator>(new MasterRosettaCalculator(scfxn_in));
+  }
+
+  std::vector<std::vector<Individual> > create_seeds(std::vector<Individual> popul, std::vector<core::pose::PoseOP> popul_pdb);
+  void apply();
+};
+
+
+class MPIResetOldCrowdingHybridDE : public ResetOldIndsCrowdingHybridDE
+{
+public:
+  boost::shared_ptr<LocalSearchIndividualMover> local_search;
+
+  MPIResetOldCrowdingHybridDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population,  boost::shared_ptr<LocalSearchIndividualMover> local_search_in, boost::shared_ptr<LocalSearchIndividualMover> greedy_search_in ) : ResetOldIndsCrowdingHybridDE(pt, scfxn_in, initial_population, local_search_in, greedy_search_in) {
+    local_search = local_search_in;
+    mpi_calculator = boost::shared_ptr<MasterRosettaCalculator>(new MasterRosettaCalculator(scfxn_in));
+  }
+  MPIResetOldCrowdingHybridDE(boost::property_tree::ptree options, FitFunctionPtr scfxn_in, std::vector<Individual> initial_population,  boost::shared_ptr<LocalSearchIndividualMover> local_search_in, boost::shared_ptr<LocalSearchIndividualMover> greedy_search_in) : ResetOldIndsCrowdingHybridDE(options, scfxn_in, initial_population, local_search_in, greedy_search_in) {
+    local_search = local_search_in;
+    mpi_calculator = boost::shared_ptr<MasterRosettaCalculator>(new MasterRosettaCalculator(scfxn_in));
+  }
+
+  void apply();
+  double score(Individual& ind);
+
+  boost::shared_ptr<MasterRosettaCalculator> mpi_calculator;
+};
+#endif
 
 // class ExtraSharedHybridMoverDE : public SharedHybridMoverDE
 // {

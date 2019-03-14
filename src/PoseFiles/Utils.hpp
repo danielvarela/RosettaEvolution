@@ -93,13 +93,13 @@ inline void read_pose(std::string pdb_path, core::pose::Pose& pose_ ) {
   using namespace protocols::simple_moves;
   using namespace core;
 
-  std::cout << "pose from file" << std::endl;
-  std::cout << "pdb_path " << pdb_path.c_str() << std::endl;
+  //std::cout << "pose from file" << std::endl;
+  //std::cout << "pdb_path " << pdb_path.c_str() << std::endl;
   //core::import_pose::pose_from_file(pose_, pdb_path.c_str(), false, core::import_pose::FileType::PDB_file);
   core::import_pose::centroid_pose_from_pdb(pose_, pdb_path.c_str(), false);
   std::string sequence = pose_.sequence();
 
-  std::cout << "size seq " << pose_.size() << std::endl;
+  //  std::cout << "size seq " << pose_.size() << std::endl;
   // char z = 'Z';
   // int i = 1;
   // int size = pose_.size();
@@ -117,6 +117,7 @@ inline void read_pose(std::string pdb_path, core::pose::Pose& pose_ ) {
 
   protocols::simple_moves::SwitchResidueTypeSetMover to_cen("centroid");
   to_cen.apply(pose_);
+
 }
 
 inline void read_density_map(std::string map_file, core::pose::Pose& ipose) {

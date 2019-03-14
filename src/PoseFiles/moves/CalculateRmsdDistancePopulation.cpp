@@ -6,6 +6,7 @@
 #include <core/conformation/Conformation.hh>
 #include <vector>
 #include <string>
+#include <sstream>
 #include <map>
 #include <utility>
 
@@ -42,6 +43,7 @@ InterDistancesGraph::print_graph() {
 }
 
 CalculateDistancePopulation::CalculateDistancePopulation(const core::pose::PoseOP& p , FitFunctionPtr sfxn,  std::string ss_in, core::scoring::ScoreFunctionOP pscore, double radius)  {
+  init_distances_map();
   pose_ind = p->clone();
   pose_other = p->clone();
   scorefxn = sfxn;
@@ -169,26 +171,97 @@ double  CalculateDistancePopulation::distance_of_individual(core::pose::PoseOP p
 
 
 
+
 int
-CalculateDistancePopulation::find_nearest(Individual target, const std::vector<Individual>& popul) {
-  build_pdb_population(popul, popul_pdb);
- 
+CalculateDistancePopulation::find_nearest(Individual target, const std::vector<Individual>& popul, int target_index, std::vector<core::pose::PoseOP> popul_pdb) {
+  if (popul_pdb.size() == 0) {
+    build_pdb_population(popul, popul_pdb);
+  }
+
   int popul_size = popul.size();
   core::pose::PoseOP pose_target = pose_ind->clone();
   pfunc->fill_pose(pose_target, target, ss);
 
-  int nearest_idx = 0;
-  double best_found = 100000;
-  for (int i = 0; i < popul_size; i++) {
-    double curr_dist = current_distance_calculation(*popul_pdb[i], *pose_target);
-    if (curr_dist < best_found) {
-      best_found = curr_dist;
-      nearest_idx = i;
+   std::vector<int> crowding_list;
+  int crowding_size = fit_radius;
+    double best_found = 100000;
+ int nearest_idx = 0;
+  if (crowding_size == popul_size) {
+
+    for (int i = 0; i < popul_size; i++) {
+      double curr_dist = current_distance_calculation(*popul_pdb[i], *pose_target);
+
+      if ((i != target_index) && (curr_dist != 0)) {
+        if (curr_dist < best_found) {
+          best_found = curr_dist;
+          nearest_idx = i;
+        }
+      }
     }
-  }
-  return nearest_idx;
+  
+  } else {
+    while (crowding_list.size() < crowding_size) {
+      int candidate = rand() % popul_size;
+      if (candidate != target_index) {
+        if (std::find(crowding_list.begin(), crowding_list.end(), candidate ) ==
+            crowding_list.end() ) {
+          crowding_list.push_back(candidate);
+        }
+      }
+    }
+    for (int i = 0; i < crowding_size; i++) {
+      double curr_dist = current_distance_calculation(*popul_pdb[crowding_list[i]], *pose_target);
+      if (curr_dist < best_found) {
+        best_found = curr_dist;
+        nearest_idx = i;
+      }
+    }
+  } 
+  
+ return nearest_idx;
 }
 
+std::vector<int>
+CalculateDistancePopulation::find_top_nearest(Individual target, const std::vector<Individual>& popul, int target_index, std::vector<core::pose::PoseOP> popul_pdb) {
+  if (popul_pdb.size() == 0) {
+    build_pdb_population(popul, popul_pdb);
+  }
+
+  int popul_size = popul.size();
+  core::pose::PoseOP pose_target = pose_ind->clone();
+  pfunc->fill_pose(pose_target, target, ss);
+
+  std::vector<int> crowding_list;
+  int crowding_size = fit_radius;
+  double best_found = 100000;
+  int nearest_idx = 0;
+
+  std::vector<std::pair<int, int> > distances_per_individual;
+  for (int i = 0; i < popul_size; i++) {
+    double curr_dist = current_distance_calculation(*popul_pdb[i], *pose_target);
+
+
+    if ((i != target_index) && (curr_dist != 0)) {
+    distances_per_individual.push_back(std::pair<int, int>(i, curr_dist));
+      if (curr_dist < best_found) {
+	best_found = curr_dist;
+	nearest_idx = i;
+      }
+    }
+  }
+
+  std::sort(distances_per_individual.begin(), distances_per_individual.end(), [] (const std::pair<int,int> &lhs, const std::pair<int,int> &rhs) {
+      return lhs.second < rhs.second;
+    });
+
+  std::vector<int> result_indexes;
+  for (int i = 0; i < 5; i++) {
+    result_indexes.push_back(distances_per_individual[i].first);
+    //    std::cout << "result_indexes " << result_indexes[i] << " dist " << distances_per_individual[i].second << std::endl;
+  }
+
+  return result_indexes;
+}
 
 void
 CalculateDistancePopulation::apply_to_population(const std::vector<Individual>& popul, std::vector<double>& shared_fitness, std::vector<double>& rmsd_to_native,std::vector<double>& distances_of_population, std::vector<std::vector<NeighStruct> >& neigh_per_ind  ) {
@@ -232,12 +305,14 @@ CalculateDistancePopulation::calculate_rmsd(const std::vector<Individual>& popul
 double CalculateDistancePopulation::distance_between_inds(Individual ind_left, Individual ind_right) {
   core::pose::PoseOP pose_1 = pose_ind->clone(), pose_2 = pose_ind->clone();
   pfunc->fill_pose(pose_1, ind_left, ss);
-  pfunc->fill_pose(pose_1, ind_right, ss);
+  pfunc->fill_pose(pose_2, ind_right, ss);
   return current_distance_calculation(*pose_1, *pose_2);
 }
 
 double
 CalculateRmsdDistancePopulation::current_distance_calculation(core::pose::Pose& pose_1, core::pose::Pose& pose_2) {
+  //  std::cout <<" ****************************************************" << std::endl;
+
   return core::scoring::CA_rmsd(pose_1, pose_2);
 }
 
@@ -441,15 +516,41 @@ CalculateEuclideanMarioDistancePopulation::CalculateEuclideanMarioDistancePopula
 CalculateEuclideanMarioDistancePopulation::CalculateEuclideanMarioDistancePopulation (const core::pose::PoseOP& p , FitFunctionPtr sfxn,  std::string ss_in, core::scoring::ScoreFunctionOP pscore, double radius)  : CalculateEuclideanDistancePopulation(p, sfxn, ss_in, pscore, radius) {
   for (int i = 1; i < ss.size(); i++) {
     if ((ss[i] != 'L') && (ss[i -1] != ss[i])) {
-      //std::cout << "ss at " << i << " val " << ss[i] << std::endl;
+      // std::cout << "ss at " << i << " val " << ss[i] << std::endl;
       selected_residues_for_rmsd.push_back(i + 1);
     }
     if ((ss[i] == 'L') && (ss[i -1] != ss[i])) {
-      //      std::cout << "ss at " << i - 1 << " val " << ss[i - 1] << std::endl;
+      //std::cout << "ss at " << i - 1 << " val " << ss[i - 1] << std::endl;
       selected_residues_for_rmsd.push_back(i);
     }
   }
 }
+
+double
+CalculateEuclideanMarioPartialDistancePopulation::individual_distance_value(Individual target, Individual reference) {
+
+  core::pose::PoseOP pose_target = pose_ind->clone();
+  pfunc->fill_pose(pose_target, target, ss);
+  core::pose::PoseOP pose_reference = pose_ind->clone();
+  pfunc->fill_pose(pose_reference, reference, ss);
+
+  return pose_distance_calculation(pose_target, pose_reference);
+
+}
+
+double
+CalculateEuclideanMarioPartialDistancePopulation::pose_distance_calculation(core::pose::PoseOP pose1, core::pose::PoseOP pose2) {
+  std::vector<double> inter_distance_target_first;
+  build_inter_distance_for_an_individual(pose1, inter_distance_target_first);
+
+  std::vector<double> inter_distance_target_second;
+  build_inter_distance_for_an_individual(pose2, inter_distance_target_second);
+
+  inter_distance_individual_1 = inter_distance_target_first;
+  inter_distance_individual_2 = inter_distance_target_second;
+  return current_distance_calculation(*pose1, *pose2);
+}
+
 
 double
 CalculateEuclideanMarioDistancePopulation::current_distance_calculation(core::pose::Pose &pose_1, core::pose::Pose &pose_2) {
@@ -464,6 +565,7 @@ CalculateEuclideanMarioDistancePopulation::current_distance_calculation(core::po
   double result = std::sqrt(sum);
   return result;
 }
+
 
 CalculateEuclideanMarioPartialDistancePopulation::CalculateEuclideanMarioPartialDistancePopulation(FitFunctionPtr fitfunc) : CalculateEuclideanDistancePopulation(fitfunc) {
 }
@@ -490,11 +592,11 @@ CalculateEuclideanMarioPartialDistancePopulation::CalculateEuclideanMarioPartial
       selected_residues_for_rmsd.push_back( half_residue );
     }
   }
+  build_inter_distances_of_straight();
 
   // for (int i = 0; i < selected_residues_for_rmsd.size(); i++) {
-  //   std::cout << "residue " << selected_residues_for_rmsd[i] << " " << ss[selected_residues_for_rmsd[i] - 1 ] << std::endl;
+  // std::cout << "residue " << selected_residues_for_rmsd[i] << " " << ss[selected_residues_for_rmsd[i] - 1 ] << std::endl;
   // }
-
   // int paa;
   // std::cin >> paa;
 
@@ -503,8 +605,7 @@ CalculateEuclideanMarioPartialDistancePopulation::CalculateEuclideanMarioPartial
 void
 CalculateEuclideanMarioPartialDistancePopulation::build_inter_distances_of_straight() {
   core::pose::PoseOP straight = pose_ind->clone();
-
-  for (int i = 1; i <= straight->total_residue(); i++) {
+  for (int i = 1; i < straight->total_residue(); i++) {
     straight->set_phi(i, 180.0);
     straight->set_psi(i, 180.0);
   }
@@ -513,19 +614,18 @@ CalculateEuclideanMarioPartialDistancePopulation::build_inter_distances_of_strai
   core::PointPosition calpha2_pos_aux = straight->residue(half_res).xyz("CA");
   double max_dist = calpha1_pos_aux.distance(calpha2_pos_aux);
 
-    for ( int i = 0; i < selected_residues_for_rmsd.size(); ++i)  {
-      for (int j  = i + 1; j < selected_residues_for_rmsd.size(); j++) {
-	core::Size res_num_1 = core::Size(selected_residues_for_rmsd[i]);
-	core::Size res_num_2 = core::Size(selected_residues_for_rmsd[j]);
-	core::PointPosition calpha1_pos  = straight->residue(res_num_1).xyz("CA");
-	core::PointPosition calpha2_pos = straight->residue(res_num_2).xyz("CA");
-	double dist = calpha1_pos.distance(calpha2_pos);
-	// falta normalizar esta distancia dividiendo por al distancia maxima ( la misma dist para la proteina estirada)
-	//inter_distance_individual_1.push_back( std::sqrt( std::pow(dist, 2) / 2)  );
-
-	inter_dist_norm_max[std::make_pair<int, int>(res_num_1, res_num_2)] = max_dist ;
-      }
+  for ( int i = 0; i < selected_residues_for_rmsd.size(); ++i)  {
+    for (int j  = i + 1; j < selected_residues_for_rmsd.size(); j++) {
+      core::Size res_num_1 = core::Size(selected_residues_for_rmsd[i]);
+      core::Size res_num_2 = core::Size(selected_residues_for_rmsd[j]);
+      core::PointPosition calpha1_pos  = straight->residue(res_num_1).xyz("CA");
+      core::PointPosition calpha2_pos = straight->residue(res_num_2).xyz("CA");
+      double dist = calpha1_pos.distance(calpha2_pos);
+      // falta normalizar esta distancia dividiendo por al distancia maxima ( la misma dist para la proteina estirada)
+      //inter_distance_individual_1.push_back( std::sqrt( std::pow(dist, 2) / 2)  );
+      inter_dist_norm_max[std::make_pair<int, int>(res_num_1, res_num_2)] = max_dist ;
     }
+  }
 }
 
 void
@@ -635,17 +735,19 @@ CalculateEuclideanMarioPartialDistancePopulation::build_inter_distance_for_an_in
 	inter_distance_individual.push_back(0);
       } else {
 	double normalized_dist = dist / ( NORM_MULTIPLIED_FACTOR * inter_dist_norm_max[std::pair<int, int>(res_num_1, res_num_2)] );
-	//	  std::cout << " dist " << dist << " norm " << normalized_dist << " max " << inter_dist_norm_max[std::pair<int, int>(res_num_1, res_num_2)] << std::endl;
+	//std::cout << " dist " << dist << " norm " << normalized_dist << " max " << inter_dist_norm_max[std::pair<int, int>(res_num_1, res_num_2)] << std::endl;
 	inter_distance_individual.push_back( normalized_dist );
       }
     }
   }
 }
 
-int
-CalculateEuclideanMarioPartialDistancePopulation::find_nearest(Individual target, const std::vector<Individual>& popul) {
-  build_pdb_population(popul, popul_pdb);
-  build_inter_distances_of_population(popul);
+std::vector<int>
+CalculateEuclideanMarioPartialDistancePopulation::find_top_nearest(Individual target, const std::vector<Individual>& popul, int target_index, std::vector<core::pose::PoseOP> popul_pdb) {
+  if (popul_pdb.size() == 0) {
+    build_pdb_population(popul, popul_pdb);
+    build_inter_distances_of_population(popul);
+  }
 
   int popul_size = popul.size();
   core::pose::PoseOP pose_target = pose_ind->clone();
@@ -658,13 +760,90 @@ CalculateEuclideanMarioPartialDistancePopulation::find_nearest(Individual target
   double best_found = 100000;
   inter_distance_individual_1 = inter_distance_target;
   // std::cout << "find_nearest " << std::endl;
+  std::vector<int> crowding_list;
+  int crowding_size = fit_radius;
+  std::vector<std::pair<int, int> > distances_per_individual;
   for (int i = 0; i < popul_size; i++) {
     inter_distance_individual_2 = inter_distances_per_ind[i];
     double curr_dist = current_distance_calculation(*popul_pdb[i], *pose_target);
-    // std::cout << i << " : " << curr_dist << std::endl;
-    if (curr_dist < best_found) {
-      best_found = curr_dist;
-      nearest_idx = i;
+
+    if ((i != target_index) && (curr_dist != 0)) {
+      distances_per_individual.push_back(std::pair<int, int>(i, curr_dist));
+      // std::cout << i << " : " << curr_dist << std::endl;
+      if (curr_dist < best_found) {
+	best_found = curr_dist;
+	nearest_idx = i;
+      }
+    }
+  }
+
+
+  std::sort(distances_per_individual.begin(), distances_per_individual.end(), [] (const std::pair<int,int> &lhs, const std::pair<int,int> &rhs) {
+      return lhs.second < rhs.second;
+    });
+
+  std::vector<int> result_indexes;
+  for (int i = 0; i < 5; i++) {
+    result_indexes.push_back(distances_per_individual[i].first);
+    //    std::cout << "result_indexes " << result_indexes[i] << " dist " << distances_per_individual[i].second << std::endl;
+  }
+
+  return result_indexes;
+}
+
+
+int
+CalculateEuclideanMarioPartialDistancePopulation::find_nearest(Individual target, const std::vector<Individual>& popul, int target_index, std::vector<core::pose::PoseOP> popul_pdb) {
+  if (popul_pdb.size() == 0) {
+    build_pdb_population(popul, popul_pdb);
+    build_inter_distances_of_population(popul);
+  }
+
+  int popul_size = popul.size();
+  core::pose::PoseOP pose_target = pose_ind->clone();
+  pfunc->fill_pose(pose_target, target, ss);
+
+  std::vector<double> inter_distance_target;
+  build_inter_distance_for_an_individual(pose_target, inter_distance_target);
+
+  int nearest_idx = 0;
+  double best_found = 100000;
+  inter_distance_individual_1 = inter_distance_target;
+  // std::cout << "find_nearest " << std::endl;
+  std::vector<int> crowding_list;
+  int crowding_size = fit_radius;
+ 
+  if (crowding_size == popul_size) {
+  for (int i = 0; i < popul_size; i++) {
+      inter_distance_individual_2 = inter_distances_per_ind[i];
+      double curr_dist = current_distance_calculation(*popul_pdb[i], *pose_target);
+      if ((i != target_index) && (curr_dist != 0)) {
+        // std::cout << i << " : " << curr_dist << std::endl;
+        if (curr_dist < best_found) {
+          best_found = curr_dist;
+          nearest_idx = i;
+        }
+      }
+    }
+  } else {
+    while (crowding_list.size() < crowding_size) {
+      int candidate = rand() % popul_size;
+      if (candidate != target_index) {
+	if (std::find(crowding_list.begin(), crowding_list.end(), candidate ) ==
+	    crowding_list.end() ) {
+	  crowding_list.push_back(candidate);
+	}
+      }
+    }
+ 
+    for (int i = 0; i < crowding_list.size(); i++) {
+      inter_distance_individual_2 = inter_distances_per_ind[crowding_list[i]];
+      double curr_dist = current_distance_calculation(*popul_pdb[crowding_list[i]], *pose_target);
+      // std::cout << i << " : " << curr_dist << std::endl;
+      if (curr_dist < best_found) {
+	best_found = curr_dist;
+	nearest_idx = crowding_list[i];
+      }
     }
   }
 
@@ -676,20 +855,144 @@ CalculateEuclideanMarioPartialDistancePopulation::find_nearest(Individual target
 double
 CalculateEuclideanMarioPartialDistancePopulation::current_distance_calculation(core::pose::Pose& pose_1, core::pose::Pose& pose_2) {
   double sum = 0.0;
-  // std::cout << "number of distances " << inter_distance_individual_1.size() << std::endl;
   for ( int i = 0; i < inter_distance_individual_1.size(); ++i)  {
     sum += std::pow( inter_distance_individual_1[i] - inter_distance_individual_2[i], 2);
-    // std::cout << inter_distance_individual_1[i] << " - " << inter_distance_individual_2[i] << std::endl;
-    // std::cout << "acum: " << sum << std::endl;
   }
 
   double result = std::sqrt(sum);
   result = result / inter_distance_individual_1.size();
-  // std::cout << "final result after sqrt and norm " << result << std::endl;
-  // int p;
-  // std::cin >> p;
 
   return result;
 }
 
 
+double
+CalculateEuclideanMarioFirstLast::current_distance_calculation(core::pose::Pose& pose_1, core::pose::Pose& pose_2) {
+  double sum = 0.0;
+  sum += std::pow( inter_distance_individual_1[0] - inter_distance_individual_2[0], 2);
+  sum += std::pow( inter_distance_individual_1[inter_distance_individual_1.size() - 1] - inter_distance_individual_2[inter_distance_individual_1.size() - 1], 2);
+  double result = std::sqrt(sum);
+  result = result / inter_distance_individual_1.size();
+
+  return result;
+}
+
+
+std::vector<double>
+PartialRMSDcalculator::partial_distance(core::pose::Pose &pose_1, core::pose::Pose &pose_2) {
+  /*CA_rmsd(Pose & pose1,Pose & pose2,Size start, Size end*/
+  std::vector<double> result;
+  for ( int i = 0; i < selected_regions.size(); ++i)  {
+    double partial_rmsd =  core::scoring::CA_rmsd(pose_1, pose_2, selected_regions[i].first, selected_regions[i].second);
+    result.push_back(partial_rmsd);
+  }
+  return result;
+}
+
+std::string
+PartialRMSDcalculator::make_head(const std::vector<Individual>& popul) {
+  std::string head;
+  std::vector<std::vector<double> > partial_rmsd_all;
+
+  build_pdb_population(popul, popul_pdb);
+  selected_regions = make_selected_regions();
+  head += " [ ";
+  for (int i = 0; i < selected_regions.size(); i++) {
+    char mot =  ss[selected_regions[i].first] ;
+    if (i != selected_regions.size() - 1) {
+      head += std::string(  " " + std::to_string(selected_regions[i].first) + " - " + std::to_string(selected_regions[i].second) + " : " + mot + " , " );
+    } else {
+      head += std::string( " " + std::to_string( selected_regions[i].first) + " - " + std::to_string(selected_regions[i].second) + " : " + mot + " ] " );
+    }
+  }
+
+  return head;
+}
+
+std::vector<std::pair<int, int> >
+PartialRMSDcalculator::make_selected_regions() {
+  std::vector<std::pair<int, int> > result;
+
+  result.resize(0);
+  int init_point = 1;
+  int first_point = init_point;
+  int end_point = init_point;
+  char current_ss_motiv = ss[init_point];
+  for (int i = init_point; i < ss.size() - 1; i++) {
+    if (ss[i] != current_ss_motiv) {
+      current_ss_motiv = ss[i];
+      end_point = i - 1;
+      first_point = init_point;
+      init_point = i;
+      if (first_point + 1 < end_point) {
+	result.push_back(std::pair<int, int>(first_point + 1, end_point + 1));
+      }
+    }
+  }
+
+  return result;
+}
+
+std::vector<std::vector<double> >
+PartialRMSDcalculator::partial_rmsd_of_population(const std::vector<Individual>& popul) {
+  std::vector<std::vector<double> > partial_rmsd_all;
+
+  build_pdb_population(popul, popul_pdb);
+  selected_regions = make_selected_regions();
+
+  for (int i = 0; i < popul_pdb.size(); i++) {
+    partial_rmsd_all.push_back(partial_distance(*popul_pdb[i], *native_)) ;
+  }
+
+  return partial_rmsd_all;
+}
+
+CalculateDistancePopulationPtr
+CalculateDistancePopulation::use_distances_strategy(std::string option) {
+
+  boost::shared_ptr<CalculateDistancePopulation> calculate_distances_popul;
+
+  switch (distances_map[option]) {
+  case rmsd: {
+    calculate_distances_popul = CalculateDistancePopulationPtr( new CalculateRmsdDistancePopulation(pose_ind, scorefxn, ss, NULL, fit_radius));
+    break;
+  }
+   case partial_rmsd: {
+    calculate_distances_popul = CalculateDistancePopulationPtr( new PartialRMSDcalculator(pose_ind, scorefxn, ss, NULL, fit_radius));
+    break;
+  }
+  case rmsd_native_diff: {
+    calculate_distances_popul = CalculateDistancePopulationPtr( new CalculateNativeDiffDistancePopulation(pose_ind, scorefxn, ss, NULL, fit_radius));
+    break;
+  }
+  case euclidean: {
+    calculate_distances_popul = CalculateDistancePopulationPtr( new CalculateEuclideanDistancePopulation(pose_ind, scorefxn, ss, NULL, fit_radius));
+    break;
+  }
+  case euclidean_loop: {
+    calculate_distances_popul = CalculateDistancePopulationPtr( new CalculateEuclideanLoopDistancePopulation(pose_ind, scorefxn, ss, NULL, fit_radius));
+    break;
+  }
+  case euclidean_diff_abs: {
+    calculate_distances_popul = CalculateDistancePopulationPtr( new CalculateEuclideanDiffAbsDistancePopulation(pose_ind, scorefxn, ss, NULL, fit_radius));
+    break;
+  }
+  case mario_first_last: {
+    calculate_distances_popul = CalculateDistancePopulationPtr( new CalculateEuclideanMarioPartialDistancePopulation(pose_ind, scorefxn, ss, NULL, fit_radius));
+    break;
+  }
+  case euclidean_partial_mario: {
+    calculate_distances_popul = CalculateDistancePopulationPtr( new CalculateEuclideanMarioPartialDistancePopulation(pose_ind, scorefxn, ss, NULL, fit_radius));
+    break;
+  }
+  case euclidean_mario: {
+    calculate_distances_popul = CalculateDistancePopulationPtr( new CalculateEuclideanMarioDistancePopulation(pose_ind, scorefxn, ss, NULL, fit_radius));
+    break;
+  }
+  default:
+    std::cout << "error with distances strategy" << std::endl;
+    exit(1);
+    break;
+  }
+  return calculate_distances_popul;
+}

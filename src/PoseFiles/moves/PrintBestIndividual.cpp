@@ -2,6 +2,9 @@
 #include "PrintBestIndividual.hpp"
 #include <string>
 #include <vector>
+#include <protocols/electron_density/SetupForDensityScoringMover.hh>
+#include <core/scoring/electron_density/ElectronDensity.hh>
+
 
 PrintBestIndividual::PrintBestIndividual(const core::pose::PoseOP& p , FitFunctionPtr sfxn,  std::string ss_in, core::scoring::ScoreFunctionOP pscore)  {
   pose_ = p->clone();
@@ -23,7 +26,14 @@ PrintBestIndividual::print(Individual ind, std::string id) {
   boost::shared_ptr<PoseFunction> pfunc = boost::dynamic_pointer_cast<PoseFunction >(scorefxn);
   pfunc->fill_pose(pose_, ind, ss);
   std::string path = "/home/dvarela/Code/RosettaEvolution/output_pdbs/best_ind_" + id +"_.pdb";
-  pose_->dump_pdb(path.c_str());
+
+#if(USE_CRYO_EM)
+  protocols::electron_density::SetupForDensityScoringMoverOP dockindens;
+  dockindens = protocols::electron_density::SetupForDensityScoringMoverOP( new protocols::electron_density::SetupForDensityScoringMover );
+     dockindens->apply(*pose_);
+   #endif
+
+     pose_->dump_pdb(path.c_str());
 
   double rmsd_vs_previous_best = 0;
   if (cnt == 0) {

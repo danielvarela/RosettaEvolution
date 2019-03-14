@@ -18,6 +18,7 @@
 class PoseFunction : public FitFunction
 {
 public:
+  PoseFunction() {}
   PoseFunction(core::pose::PoseOP p) : FitFunction() {
     pose_ = p->clone();
     scorefxn = core::scoring::get_score_function();
@@ -49,9 +50,9 @@ public:
     int size = D_;
 
     // std::cout << "fill_pose " << std::endl;
-    for (int i = 0 ; i < size; ++i) {
+    for (int i = 0 ; i < size && (nres < static_cast<int>(p->size())); ++i) {
       //  std::cout << nres << " : " << p->sequence()[nres - 1] << std::endl;
-      if (is_pair(i) && (nres < static_cast<int>(p->size()))) {
+      if (is_pair(i)) {
 	p->set_phi(nres, ind_converted.vars[i]);
       } else {
         p->set_psi(nres, ind_converted.vars[i]);
@@ -86,7 +87,7 @@ public:
     return name_;
   }
 
-protected:
+public:
   int D_;
   core::pose::PoseOP pose_;
   core::scoring::ScoreFunctionOP scorefxn;
@@ -99,6 +100,8 @@ class PoseScoreFunction : public PoseFunction
 public:
   FragInsertionMoverPtr frag_mover;
 
+
+  PoseScoreFunction(){}
   PoseScoreFunction(core::pose::PoseOP p, core::scoring::ScoreFunctionOP sfxn, std::string ss_in, FragInsertionMoverPtr frag_mover_) : PoseFunction(p, sfxn, ss_in) {
     frag_mover = frag_mover_;
   }
@@ -114,26 +117,27 @@ public:
 
   std::string print_stats() override {
     int total_improves = 0;
-     if (stats.find("improved_after_de") != stats.end()) {
-      total_improves = stats["improved_after_de"];
-    } else {
-      total_improves = 0;
-    }
+    total_improves = static_cast<int>(stats.obtain("improved_after_de"));
 
-     std::string output_string = "[DE_IMPROVED] " + std::to_string(total_improves);
+    std::string output_string = "[DE_IMPROVED] " + std::to_string(total_improves);
     if (total_improves > 0) {
-      output_string += " amt_improves " + std::to_string( stats["improved_amt_de"] / stats["improved_after_de"] );
-      } else {
+      output_string += " amt_improves " + std::to_string( stats.obtain("improved_amt_de") );
+    } else {
       output_string += " amt_improves 0";
     }
-
-   if (stats.find("total_tries_de") != stats.end()) {
-      output_string += " total_tries " + std::to_string(stats["total_tries_de"]);
+    if (stats.obtain("avg_before_de") != 0) {
+      output_string += " avg_before_de " + std::to_string(stats.obtain("avg_before_de") / stats.obtain("de_individuals") );
     }
-    if (stats.find("accepted_fragments_de") != stats.end()) {
-      output_string += " accepted_fragments " + std::to_string(stats["accepted_fragments_de"]);
+    if (stats.obtain("avg_after_de") != 0) {
+      output_string += " avg_after_de " + std::to_string(stats.obtain("avg_after_de") / stats.obtain("de_individuals") );
     }
 
+
+    if (stats.obtain("total_tries_de") > 0)
+      output_string += " total_tries " + std::to_string(stats.obtain("total_tries_de") );
+
+    if (stats.obtain("accepted_fragments_de") > 0)
+      output_string += " accepted_fragments " + std::to_string(stats.obtain("accepted_fragments_de"));
 
     return output_string;
   }
@@ -143,26 +147,23 @@ public:
     int nres = start_res();
     int size = D_;
 
-    //    std::cout << "fill_pose " << std::endl;
-    for (int i = 0 ; nres <= p->total_residue(); i=i+2) {
-      //std::cout << nres << " : " << p->sequence()[nres - 1] << std::endl;
+    for (int i = 0 ; nres < p->total_residue(); i=i+2) {
 	p->set_phi(nres, ind_converted.vars[i]);
         p->set_psi(nres, ind_converted.vars[i+1]);
         p->set_secstruct(nres, ind_converted.ss[nres - 1]);
 	nres++;
       }
 
-    for (int i = 1; i <= p->total_residue(); i++) {
+    for (int i = 1; i < p->total_residue(); i++) {
       p->set_omega(i, ind_converted.omega[i - 1]);
     }
-
   }
 
 
   void pose_to_ind(core::pose::PoseOP inner_pose_, Individual& ind) {
     int ind_size = D_;
     int nres = 1;
-    for (int j = 0; nres <= inner_pose_->total_residue(); j = j+2) {
+    for (int j = 0; nres < inner_pose_->total_residue(); j = j+2) {
       ind.vars[j] = scale(inner_pose_->phi(nres));
       ind.vars[j + 1] = scale(inner_pose_->psi(nres));
       ind.omega[nres - 1] = inner_pose_->omega(nres);
@@ -171,7 +172,7 @@ public:
     ind.ss = inner_pose_->secstruct();
   }
 
-  double score(Individual& ind) override {
+  virtual double score(Individual& ind) override {
     core::pose::PoseOP inner_pose = pose_->clone();
     fill_pose(inner_pose, ind, ss);
     double result = SCORE_ERROR_FIXED + (*scorefxn)(*inner_pose);
@@ -183,20 +184,45 @@ public:
     return ind.score;
   }
 
-  double run_frag_mover(core::pose::Pose& pose) {
+  virtual double run_frag_mover(core::pose::Pose& pose) {
     frag_mover->apply(pose);
     return SCORE_ERROR_FIXED +  (*scorefxn)(pose);
   }
 
 };
 
-class PoseFragmentFunction : public PoseFunction
+class PoseDensityFunction : public PoseScoreFunction
 {
 public:
-  FragInsertionMoverPtr frag_mover;
+  protocols::electron_density::SetupForDensityScoringMoverOP dockindens;
+  PoseDensityFunction(core::pose::PoseOP p, core::scoring::ScoreFunctionOP sfxn, std::string ss_in, FragInsertionMoverPtr frag_mover_) : PoseScoreFunction(p, sfxn, ss_in, frag_mover_) {
+  dockindens = protocols::electron_density::SetupForDensityScoringMoverOP( new protocols::electron_density::SetupForDensityScoringMover );
+  scorefxn->set_weight( core::scoring::elec_dens_fast, 30.0 );
+  }
 
-  PoseFragmentFunction(core::pose::PoseOP p, core::scoring::ScoreFunctionOP sfxn, std::string ss_in, FragInsertionMoverPtr frag_mover_) : PoseFunction(p, sfxn, ss_in) {
-    frag_mover = frag_mover_;
+  virtual double score(Individual& ind) override {
+    core::pose::PoseOP inner_pose = pose_->clone();
+    fill_pose(inner_pose, ind, ss);
+    dockindens->apply(*inner_pose);
+    double result = SCORE_ERROR_FIXED + (*scorefxn)(*inner_pose);
+    ind.score = result;
+    return result;
+   }
+
+  virtual double run_frag_mover(core::pose::Pose& pose) {
+    frag_mover->apply(pose);
+    dockindens->apply(pose );
+    return SCORE_ERROR_FIXED +  (*scorefxn)(pose);
+  }
+
+
+};
+
+
+class PoseFragmentFunction : public PoseScoreFunction {
+public:
+  PoseFragmentFunction() : PoseScoreFunction() {}
+  PoseFragmentFunction(core::pose::PoseOP p, core::scoring::ScoreFunctionOP sfxn, std::string ss_in, FragInsertionMoverPtr frag_mover_) : PoseScoreFunction(p, sfxn, ss_in, frag_mover_) {
   }
 
   double scale( double old_value) {
@@ -210,118 +236,167 @@ public:
 
   std::string print_stats() override {
     int total_improves = 0;
-     if (stats.find("improved_after_de") != stats.end()) {
-      total_improves = stats["improved_after_de"];
-    } else {
-      total_improves = 0;
-    }
+    total_improves = static_cast<int>(stats.obtain("improved_after_de"));
 
-     std::string output_string = "[DE_IMPROVED] " + std::to_string(total_improves);
+    std::string output_string = "[DE_IMPROVED] " + std::to_string(total_improves);
     if (total_improves > 0) {
-      output_string += " amt_improves " + std::to_string( stats["improved_amt_de"] / stats["improved_after_de"] );
-      } else {
+      output_string += " amt_improves " + std::to_string( stats.obtain("improved_amt_de") );
+    } else {
       output_string += " amt_improves 0";
     }
 
-   if (stats.find("total_tries_de") != stats.end()) {
-      output_string += " total_tries " + std::to_string(stats["total_tries_de"]);
+    if (stats.obtain("avg_before_de") != 0) {
+      output_string += " avg_before_de " + std::to_string(stats.obtain("avg_before_de") / stats.obtain("de_individuals") );
     }
-    if (stats.find("accepted_fragments_de") != stats.end()) {
-      output_string += " accepted_fragments " + std::to_string(stats["accepted_fragments_de"]);
+    if (stats.obtain("avg_after_de") != 0) {
+      output_string += " avg_after_de " + std::to_string(stats.obtain("avg_after_de") / stats.obtain("de_individuals") );
     }
 
 
+    if (stats.obtain("total_tries_de") > 0.001) {
+      output_string += " total_tries " + std::to_string(stats.obtain("total_tries_de") );
+    }
+
+    if (stats.obtain("accepted_fragments_de") > 0.001) {
+    output_string += " accepted_fragments " + std::to_string(stats.obtain("accepted_fragments_de"));
+    }
     return output_string;
   }
 
-  void fill_pose(core::pose::PoseOP p, const Individual& ind, std::string ss_) {
-    Individual ind_converted = convert(ind);
-    int nres = start_res();
-    int size = D_;
 
-    //    std::cout << "fill_pose " << std::endl;
-    for (int i = 0 ; nres <= p->total_residue(); i=i+2) {
-      //std::cout << nres << " : " << p->sequence()[nres - 1] << std::endl;
-	p->set_phi(nres, ind_converted.vars[i]);
-        p->set_psi(nres, ind_converted.vars[i+1]);
-        p->set_secstruct(nres, ind_converted.ss[nres - 1]);
-	nres++;
-      }
+  // void fill_pose(core::pose::PoseOP p, const Individual& ind, std::string ss_) {
+  //   Individual ind_converted = convert(ind);
+  //   int nres = start_res();
+  //   int size = D_;
 
-    for (int i = 1; i <= p->total_residue(); i++) {
-      p->set_omega(i, ind_converted.omega[i - 1]);
-    }
+  //   //    std::cout << "fill_pose " << std::endl;
+  //   for (int i = 0 ; nres < p->total_residue(); i=i+2) {
+  //     //std::cout << nres << " : " << p->sequence()[nres - 1] << std::endl;
+  // 	p->set_phi(nres, ind_converted.vars[i]);
+  //       p->set_psi(nres, ind_converted.vars[i+1]);
+  //       p->set_secstruct(nres, ind_converted.ss[nres - 1]);
+  // 	nres++;
+  //     }
 
-  }
+  //   for (int i = 1; i < p->total_residue(); i++) {
+  //     p->set_omega(i, ind_converted.omega[i - 1]);
+  //   }
+
+  // }
 
 
-  void pose_to_ind(core::pose::PoseOP inner_pose_, Individual& ind) {
-    int ind_size = D_;
-    int nres = 1;
-    for (int j = 0; nres <= inner_pose_->total_residue(); j = j+2) {
-      ind.vars[j] = scale(inner_pose_->phi(nres));
-      ind.vars[j + 1] = scale(inner_pose_->psi(nres));
-      ind.omega[nres - 1] = inner_pose_->omega(nres);
-      nres++;
-    }
-    ind.ss = inner_pose_->secstruct();
-  }
+  // void pose_to_ind(core::pose::PoseOP inner_pose_, Individual& ind) {
+  //   int ind_size = D_;
+  //   int nres = 1;
+  //   for (int j = 0; nres < inner_pose_->total_residue(); j = j+2) {
+  //     ind.vars[j] = scale(inner_pose_->phi(nres));
+  //     ind.vars[j + 1] = scale(inner_pose_->psi(nres));
+  //     ind.omega[nres - 1] = inner_pose_->omega(nres);
+  //     nres++;
+  //   }
+  //   ind.ss = inner_pose_->secstruct();
+  // }
 
   double score(Individual& ind) override {
     return apply_fragment_stage(ind);
   }
 
-  double apply_fragment_stage(Individual& ind) {
+  virtual double apply_fragment_stage(Individual& ind) {
+    stats.increment("de_individuals");
     core::pose::PoseOP inner_pose = pose_->clone();
     fill_pose(inner_pose, ind, ss);
     double result = SCORE_ERROR_FIXED + (*scorefxn)(*inner_pose);
+    //std::cout << "antes : " <<  (-1 * SCORE_ERROR_FIXED) + result  << " ";
+    stats.record("avg_before_de", (-1 * SCORE_ERROR_FIXED) + result );
     ind.score = result;
     core::pose::PoseOP pose_backup = inner_pose->clone();
     double result_after_frags = run_frag_mover(*inner_pose);
-    if (result_after_frags < result) {
-      pose_to_ind(inner_pose, ind);
-      result = result_after_frags;
 
-      if (stats.find("improved_after_de") != stats.end()) {
-    	stats["improved_after_de"]++;
-    	stats["improved_amt_de"] += (result_after_frags - result);
-      } else {
-    	stats["improved_after_de"] = 1;
-    	stats["improved_amt_de"] = 0;
-      }
+    //    std::cout << "despues : " <<  (-1 * SCORE_ERROR_FIXED) + result_after_frags  << std::endl;
+    if ( std::abs(result_after_frags - result) > 0.00001) {
+      pose_to_ind(inner_pose, ind);
+      ind.score = result_after_frags;
+      stats.increment("improved_after_de");
+      stats.record("improved_amt_de",  std::abs( result_after_frags - result ) );
+      result = result_after_frags;
     } else {
       pose_to_ind(pose_backup, ind);
+      ind.score = result;
     }
 
-    if (stats.find("total_tries") != stats.end()) {
-      if (stats.find("total_tries_de") == stats.end()) {
-    	stats["total_tries_de"] = 0;
-      }
+    stats.record("avg_after_de", (-1 * SCORE_ERROR_FIXED) +  ind.score );
 
-      stats["total_tries_de"] += stats["total_tries"];
-      stats.erase("total_tries");
-    }
+    stats.record("total_tries_de", stats.obtain("total_tries") );
+    stats.erase("total_tries");
 
-    if (stats.find("accepted_fragments") != stats.end()) {
-      if (stats.find("accepted_fragments_de") == stats.end()) {
-    	stats["accepted_fragments_de"] = 0;
-      }
+    stats.record("accepted_fragments_de", stats.obtain("accepted_fragments") );
+    stats.erase("accepted_fragments");
 
-      stats["accepted_fragments_de"] += stats["accepted_fragments"];
-      stats.erase("accepted_fragments");
-    }
+    return result;
+  }
 
+  virtual double run_frag_mover(core::pose::Pose& pose) {
+    frag_mover->apply(pose);
+    double result = SCORE_ERROR_FIXED +  (*scorefxn)(pose);
+    return result;
+  }
+
+};
+
+
+class PoseDensityFragmentFunction : public PoseFragmentFunction
+{
+public:
+  protocols::electron_density::SetupForDensityScoringMoverOP dockindens;
+  PoseDensityFragmentFunction() : PoseFragmentFunction() {}
+  PoseDensityFragmentFunction(core::pose::PoseOP p, core::scoring::ScoreFunctionOP sfxn, std::string ss_in, FragInsertionMoverPtr frag_mover_) :  PoseFragmentFunction(p, sfxn, ss_in, frag_mover_) {
+  dockindens = protocols::electron_density::SetupForDensityScoringMoverOP( new protocols::electron_density::SetupForDensityScoringMover );
+  scorefxn->set_weight( core::scoring::elec_dens_fast, 30.0 );
+  }
+
+  double apply_fragment_stage(Individual& ind) {
+    stats.increment("de_individuals");
+    core::pose::PoseOP inner_pose = pose_->clone();
+    fill_pose(inner_pose, ind, ss);
+    dockindens->apply(*inner_pose);
+    double result = SCORE_ERROR_FIXED + (*scorefxn)(*inner_pose);
+    std::cout << "FRAGS antes : " <<  (-1 * SCORE_ERROR_FIXED) + result  << " ";
+    stats.record("avg_before_de", (-1 * SCORE_ERROR_FIXED) + result );
     ind.score = result;
+    core::pose::PoseOP pose_backup = inner_pose->clone();
+    double result_after_frags = run_frag_mover(*inner_pose);
+
+    std::cout << "FRAGS despues : " <<  (-1 * SCORE_ERROR_FIXED) + result_after_frags  << std::endl;
+    if ( std::abs(result_after_frags - result) > 0.00001) {
+      pose_to_ind(inner_pose, ind);
+      ind.score = result_after_frags;
+      stats.increment("improved_after_de");
+      stats.record("improved_amt_de",  std::abs( result_after_frags - result ) );
+      result = result_after_frags;
+    } else {
+      pose_to_ind(pose_backup, ind);
+      ind.score = result;
+    }
+
+    stats.record("avg_after_de", (-1 * SCORE_ERROR_FIXED) +  ind.score );
+
+    stats.record("total_tries_de", stats.obtain("total_tries") );
+    stats.erase("total_tries");
+
+    stats.record("accepted_fragments_de", stats.obtain("accepted_fragments") );
+    stats.erase("accepted_fragments");
+
     return result;
   }
 
   double run_frag_mover(core::pose::Pose& pose) {
     frag_mover->apply(pose);
-    return SCORE_ERROR_FIXED +  (*scorefxn)(pose);
+    dockindens->apply(pose);
+    double result = SCORE_ERROR_FIXED +  (*scorefxn)(pose);
+    return result;
   }
 
 };
-
 
 class PoseToyFunction : public PoseFragmentFunction
 {
@@ -365,8 +440,8 @@ public:
     int nres = range.i;
     int size = D_;
 
-    for (int i = 0 ; i < size; ++i) {
-      if (is_pair(i) && (nres < static_cast<int>(p->size()))) {
+    for (int i = 0 ; i < size  && (nres < static_cast<int>(p->size())); ++i) {
+      if (is_pair(i)) {
 	p->set_phi(nres, ind_converted.vars[i]);
       } else {
         p->set_psi(nres, ind_converted.vars[i]);

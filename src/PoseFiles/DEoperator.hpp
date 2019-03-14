@@ -69,22 +69,22 @@ public:
   std::map<std::string, Protinfo> prot_selection;
 
   enum distances_enum {
-    rmsd, rmsd_native_diff, euclidean, euclidean_loop, euclidean_diff_abs, euclidean_partial_mario, euclidean_mario
+    dist_error, rmsd, partial_rmsd, rmsd_native_diff, euclidean, euclidean_loop, euclidean_diff_abs, euclidean_partial_mario, euclidean_mario, mario_first_last
   };
   std::map<std::string, distances_enum> distances_map;
 
   enum protocol_name_enum{
-    Shared, HybridShared, CrowdingDE, HybridCrowdingDE
+    protocol_error, Shared, HybridMover, HybridShared, ResetOldIndsHybrid ,  ResetOldIndsCrowdingHybrid , MPISeedsDE, MPIResetOldCrowdingDE, MPICrowdingDE, CrowdingDE, HybridCrowdingDE
   };
   std::map<std::string, protocol_name_enum> protocol_name_map;
 
   enum init_popul_strategy_enum{
-    total_random, total_random_pose_based, random_pose_based, init_popul_with_stage
+    popul_error, total_random, total_random_pose_based, random_pose_based, init_popul_with_stage
   };
   std::map<std::string, init_popul_strategy_enum> init_popul_strategy_map;
 
   enum fragment_insertion_strategy_enum {
-    my_frag_insertion, greedy_search, stage_rosetta_mover, ILS_as_julia
+    frag_error, my_frag_insertion, no_greedy_search, greedy_search, hybrid_mover, stage_rosetta_mover, ILS_as_julia
   };
 
   std::map<std::string, fragment_insertion_strategy_enum> fragment_insertion_strategy_map;
@@ -128,6 +128,8 @@ public:
 
   void print_best_pose();
 
+  void print_final_population(std::vector<Individual> popul );
+
   void apply_differential_evolution_with_stage(std::string stage_name);
 
   void init_two_stages_mover();
@@ -139,6 +141,8 @@ public:
   core::pose::PoseOP get_native_pose();
 
   virtual void run();
+
+  void run_complete_abinitio();
 
 public:
   int pose_size;

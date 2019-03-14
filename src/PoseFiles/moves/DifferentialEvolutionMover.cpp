@@ -6,6 +6,11 @@
 #include <algorithm>
 #include <string>
 #include <omp.h>
+#include <chrono>
+#include <utility>
+#include <map>
+#include <boost/pointer_cast.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include <stdlib.h>
 #include <boost/make_shared.hpp>
@@ -39,7 +44,9 @@ MoverDE::MoverDE() {
   avg_acc = 0;
   best = 0;
   best_idx = 0;
-
+  mutation_strategy = std::string("default");
+  clean_inds_gen_limit = 1000000;
+  local_search_popul_module = 10;
   // init_popul(popul);
 }
 
@@ -49,6 +56,11 @@ MoverDE::MoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, std::vector<Indivi
   scfxn = scfxn_in;
   id = std::to_string( static_cast<int>(std::abs(rand())) );
 
+#if(MPI_ENABLED)
+  mpi_calculator = boost::shared_ptr<MasterRosettaCalculator>(new MasterRosettaCalculator(scfxn_in));
+#endif
+
+  mutation_strategy = std::string("default");
   //  init_popul_ = init_popul_in;
 
   NP = pt.NP;
@@ -58,6 +70,7 @@ MoverDE::MoverDE(ConfigurationDE pt, FitFunctionPtr scfxn_in, std::vector<Indivi
   CR = pt.CR;
   F = pt.F;
   prot = pt.prot;
+  local_search_popul_module = 10;
 
   avg_acc = 1;
   best = 100000;
@@ -84,6 +97,29 @@ MoverDE::MoverDE(boost::property_tree::ptree options, FitFunctionPtr scfxn_in, s
   use_print_class = false;
   scfxn = scfxn_in;
   //  init_popul_ = init_popul_in;
+#if(MPI_ENABLED)
+  mpi_calculator = boost::shared_ptr<MasterRosettaCalculator>(new MasterRosettaCalculator(scfxn_in));
+#endif
+
+
+  mutation_strategy = std::string("default");
+  boost::property_tree::ptree::const_assoc_iterator it = app_options.find("Protocol.mutation_strategy");
+  if(app_options.not_found() == it) {
+    mutation_strategy = app_options.get<std::string>("Protocol.mutation_strategy");
+  }
+
+  boost::optional< boost::property_tree::ptree& > child = app_options.get_child_optional( "Protocol.clean_gen_limit" );
+  if( !child ) {
+    clean_inds_gen_limit = 10000;
+  } else {
+    clean_inds_gen_limit =  app_options.get<int>("Protocol.clean_gen_limit");
+  }
+  child = app_options.get_child_optional( "Protocol.fragments_popul_module" );
+  if( !child ) {
+    local_search_popul_module = 1;
+  } else {
+    local_search_popul_module =  app_options.get<int>("Protocol.fragments_popul_module");
+  }
 
   NP = app_options.get<int>("DE.NP");
   Gmax = 10000;
@@ -93,7 +129,7 @@ MoverDE::MoverDE(boost::property_tree::ptree options, FitFunctionPtr scfxn_in, s
   F = app_options.get<double>("DE.F");
   prot = app_options.get<std::string>("Protocol.prot");
 
-  boost::property_tree::ptree::const_assoc_iterator it = app_options.find("PrintPopul.gens");
+  it = app_options.find("PrintPopul.gens");
   if(app_options.not_found() == it) {
     std::string desired_gens_opt = app_options.get<std::string>("PrintPopul.gens");
     boost::char_separator<char> sep(",");
@@ -143,42 +179,100 @@ void MoverDE::init_popul(std::vector<Individual>& popul) {
 
 void MoverDE::apply() {
   gen_count = 0;
-
   id = std::to_string( static_cast<int>(std::abs(rand())) );
   Parents parents;
   new_best_found = false;
   std::cout << "init DE for function " << scfxn->name() << std::endl;
   std::vector<Individual> trial_popul;
-
+  popul_pdb.resize(NP);
   while (gen_count < Gmax) {
     reset_stat();
     trial_popul.resize(0);
-
-     // #pragma omp parallel
-    // #pragma omp for
+    calculate_distances_popul->build_pdb_population(popul,popul_pdb);
     for (int i = 0; i < NP; ++i) {
-      //      score(popul[i]);
       select_parents(i, parents);
       Individual ind = sample_new_individual(i, parents, popul);
       trial_popul.push_back(ind);
     }
 
+#if(MPI_ENABLED)
+    trial_popul = mpi_calculator->run(trial_popul);
+#endif
     new_best_found = select_population(trial_popul);
-
     print_generation_information(gen_count, new_best_found);
-    // std::ofstream myfile;
-    // std::string filename = "./.matplotlib_files/output_popul_gen_"+std::to_string(gen_count)+".txt";
-    // myfile.open (filename);
-    // for (int i = 0; i < popul.size(); i++) {
-    //   Individual ind_converted = scfxn->convert(popul[i]);
-    //   myfile << std::setprecision(4) << ind_converted.vars[0] << " " << ind_converted.vars[1] << " " << ind_converted.score << std::endl;
-    // }
-    // myfile.close();
-    // std::cout << "End of gen " << gen_count << std::endl;
-    // int p;
-    // std::cin >> p;
     ++gen_count;
+  }
+}
 
+void MoverDE::apply(std::vector<Individual>& popul_in, int NP_in, int Gmax_in) {
+  gen_count = 0;
+  int my_gen_count = 0;
+  id = std::to_string( static_cast<int>(std::abs(rand())) );
+  Parents parents;
+  new_best_found = false;
+  popul = popul_in;
+  NP = NP_in;
+  Gmax = Gmax_in;
+  //std::cout << "INIT DE" << std::endl;
+  double best_energy = popul_in[0].score;
+  int best_idx_aux = 0;
+  for (int i = 1; i < popul_in.size(); i++) {
+    if (popul_in[i].score < best_energy) {
+      best_idx_aux = i;
+      best_energy = popul_in[i].score;
+    }
+  }
+  best_idx = best_idx_aux;
+
+  popul_pdb.resize(NP);
+  std::vector<Individual> trial_popul;
+  while (my_gen_count < Gmax) {
+    reset_stat();
+    trial_popul.resize(0);
+    calculate_distances_popul->build_pdb_population(popul_in,popul_pdb);
+    for (int i = 0; i < NP; ++i) {
+      select_parents(i, parents);
+      Individual ind = sample_new_individual(i, parents, popul_in);
+      trial_popul.push_back(ind);
+    }
+
+#if(MPI_ENABLED)
+    trial_popul = mpi_calculator->run(trial_popul);
+#endif
+    new_best_found = select_population(trial_popul);
+    popul_in = popul;
+    // print_generation_information(gen_count, new_best_found);
+    ++my_gen_count;
+  }
+}
+
+void HybridMoverDE::apply_local_search_at_population() {
+  if (gen_count % local_search_popul_module == 0) {
+  local_search->reset_stats();
+    double avg_before = 0, avg_after = 0;
+    for (int i = 0; i < NP; ++i) {
+      avg_before += (-1 * SCORE_ERROR_FIXED) + popul[i].score;
+      local_search->apply(popul[i]);
+      avg_after += (-1 * SCORE_ERROR_FIXED) + popul[i].score;
+    }
+    std::cout << local_search->print_stats() << " avg_before " << avg_before / NP << " avg_after " << avg_after / NP << std::endl;
+  }
+}
+
+
+void SharedHybridMoverDE::apply_local_search_at_population() {
+  if (gen_count % local_search_popul_module == 0) {
+  local_search->reset_stats();
+    double avg_before = 0, avg_after = 0;
+    for (int i = 0; i < NP; ++i) {
+      avg_before += (-1 * SCORE_ERROR_FIXED) + popul[i].score;
+    }
+    popul = mpi_calculator->run(popul);
+    for (int i = 0; i < NP; ++i) {
+      avg_after += (-1 * SCORE_ERROR_FIXED) + popul[i].score;
+    }
+
+    std::cout << local_search->print_stats() << " avg_before " << avg_before / NP << " avg_after " << avg_after / NP << std::endl;
   }
 }
 
@@ -189,46 +283,21 @@ void HybridMoverDE::apply() {
   new_best_found = false;
   std::cout << "init Hybrid DE for function " << scfxn->name() << std::endl;
   std::vector<Individual> trial_popul;
-  double global_min_rmsd, global_max_rmsd, global_avg_rmsd;
   while (gen_count < Gmax) {
     reset_stat();
+    scfxn->reset_stats();
     local_search->reset_stats();
     trial_popul.resize(0);
-    global_min_rmsd = 100000;
-    global_max_rmsd = -100000;
-    global_avg_rmsd = 0;
+      //#pragma omp parallel for private(local_search)
 
-    //#pragma omp parallel for private(local_search)
-    for (int i = 0; i < NP; ++i) {
-      //std::cout<<"threads="<<omp_get_num_threads()<<std::endl;
-
-      // apparently it disturbs the right score of the population
-      local_search->apply(popul[i]);
-    }
+    //apply_local_search_at_population();
+    calculate_distances_popul->build_pdb_population(popul,popul_pdb);
 
     for (int i = 0; i < NP; ++i) {
       select_parents(i, parents);
-
       Individual ind = sample_new_individual(i, parents, popul);
-      if (CR > 0.5) {
-	double new_rmsd = calculate_distances_popul->distance_between_inds(ind, popul[parents.x1]);
-	if (new_rmsd > global_max_rmsd) {
-	  global_max_rmsd = new_rmsd;
-	}
-	if (new_rmsd < global_min_rmsd) {
-	  global_min_rmsd = new_rmsd;
-	}
-	global_avg_rmsd += new_rmsd;
-      } else {
-	double new_rmsd = calculate_distances_popul->distance_between_inds(ind, popul[i]);
-	std::cout << "rmsd parent " << i << " " << new_rmsd << std::endl;
-      }
-
       trial_popul.push_back(ind);
     }
-
-    std::cout << "[RMSD_TRIALS] GEN " << gen_count << " { " << global_min_rmsd << " , " << global_max_rmsd << " } " << global_avg_rmsd / NP << std::endl;
-
     new_best_found = select_population(trial_popul);
 
     print_generation_information(gen_count, new_best_found);
@@ -236,48 +305,75 @@ void HybridMoverDE::apply() {
   }
 }
 
-
 bool MoverDE::select_population(const std::vector<Individual>& trial_popul) {
-  bool new_best_found = false;
-  std::vector<Individual> large_popul = trial_popul;
-  large_popul.insert(large_popul.end(), popul.begin(), popul.end());
+  // bool new_best_found = false;
+  // std::vector<Individual> large_popul = trial_popul;
+  // large_popul.insert(large_popul.end(), popul.begin(), popul.end());
 
-  std::sort(large_popul.begin(), large_popul.end(), popul_comparer);
-  large_popul.resize(popul.size());
+  // std::sort(large_popul.begin(), large_popul.end(), popul_comparer);
+  // large_popul.resize(popul.size());
 
-  if (large_popul[0].score < popul[0].score) {
-    new_best_found = true;
-  }
-
-  popul = large_popul;
-
+  // if (large_popul[0].score < popul[0].score) {
+  //   new_best_found = true;
+  // }
+  // popul = large_popul;
   // default version of selection
-  //   trial_sucess_n = 0;
-//   for (int i = 0; i < NP; i++) {
-//     if (trial_popul[i].score < popul[i].score) {
-//       popul[i] = trial_popul[i];
-//       trial_sucess_n++;
-//     }
+  // trial_sucess_n = 0;
+  // avg_acc = 0;
+  // for (int i = 0; i < NP; i++) {
+  //   avg_acc += popul[i].score;
+  //   if (trial_popul[i].score < popul[i].score) {
+  //     popul[i] = trial_popul[i];
+  //     trial_sucess_n++;
+  //   }
+  // }
+  trial_sucess_n = 0;
+  //  best_idx = 0;
+  best = popul[best_idx].score;
+  for (int i = 0; i < popul.size(); i++) {
+    //std::cout << (-1 * SCORE_ERROR_FIXED) + popul[i].score << " ( "<< popul[i].score << " ) ";
+    if (trial_popul[i].score < popul[i].score) {
+      popul[i] = trial_popul[i];
+      if (popul[i].score < best) {
+	best_idx = i;
+	best = popul[i].score;
+	trial_sucess_n++;
+	if (best < previous_best) {
+	  new_best_found = true;
+	}
 
-//
-//   }
-
-//   return new_best_found;
-  new_best_found = update_stat(0, trial_popul[0], popul) || new_best_found;
+      }
+    }
+    avg_acc += popul[i].score;
+  }
+  //new_best_found = update_stat(0, trial_popul[0], popul) || new_best_found;
   return new_best_found;
 }
 
 bool CrowdingHybridMoverDE::select_population(const std::vector<Individual>& trial_popul) {
+  //  SharedHybridMoverDE::select_population(trial_popul);
+
+
   trial_sucess_n = 0;
   // Crowding DE: Rene Thomsen Algorithm
   // 1. Each trial can be replace only its nearest individual if the energy is better
 
   bool new_best_found = false;
   double previous_best = popul[best_idx].score;
+
+  bool only_de = true;
+
   for (int i = 0; i < trial_popul.size(); i++) {
-    int nearest_ind = calculate_distances_popul->find_nearest(trial_popul[i], popul);
-    if ( trial_popul[i].score < popul[nearest_ind].score ) {
-      popul[nearest_ind] = trial_popul[i];
+    int target_ind = 0;
+
+    if (only_de) {
+      target_ind = i;
+    } else {
+      target_ind = calculate_distances_popul->find_nearest(trial_popul[i], popul);
+    }
+
+    if ( trial_popul[i].score < popul[target_ind].score ) {
+      popul[target_ind] = trial_popul[i];
       new_best_found = true;
       trial_sucess_n++;
     }
@@ -285,6 +381,7 @@ bool CrowdingHybridMoverDE::select_population(const std::vector<Individual>& tri
 
   avg_acc = 0;
   best_idx = 0;
+  best = popul[0].score;
   //  std::cout << "check_popul ";
   for (int i = 0; i < popul.size(); i++) {
     //std::cout << (-1 * SCORE_ERROR_FIXED) + popul[i].score << " ( "<< popul[i].score << " ) ";
@@ -293,7 +390,7 @@ bool CrowdingHybridMoverDE::select_population(const std::vector<Individual>& tri
       best_idx = i;
       best = popul[best_idx].score;
       if (best < previous_best) {
-	new_best_found = true;
+  	new_best_found = true;
       }
     }
   }
@@ -314,6 +411,7 @@ void CrowdingMoverDE::print_fitness_population(int gen_count) {
       std::cout << (-1 * SCORE_ERROR_FIXED) + popul[i].score << " ";
     }
     std::cout << std::endl;
+
   }
 }
 
@@ -324,12 +422,16 @@ bool CrowdingMoverDE::select_population(const std::vector<Individual>& trial_pop
 
   bool new_best_found = false;
   double previous_best = popul[best_idx].score;
+  double temp;
+  std::vector<NeighStruct> aux(100);
+  std::vector<double> aux_2(100);
+  double value_dist_of_ind =  boost::dynamic_pointer_cast<CalculateEuclideanMarioPartialDistancePopulation>(calculate_distances_popul)->distance_of_individual_partial_mario_euclidean(popul_pdb[best_idx],popul, temp,aux, aux_2);
 
   for (int i = 0; i < trial_popul.size(); i++) {
     int nearest_ind = calculate_distances_popul->find_nearest(trial_popul[i], popul);
     double previous_score = popul[nearest_ind].score;
+    //std::cout << "nearest ind " << nearest_ind << " ind " << i << "(" << calculate_distances_popul->distance_between_inds(trial_popul[i], popul[nearest_ind])   << ") : " << trial_popul[i].score << " " << previous_score << std::endl;
     if ( trial_popul[i].score < popul[nearest_ind].score ) {
-      //      std::cout << "nearest ind " << nearest_ind << " ind " << i << "(" << calculate_distances_popul->distance_between_inds(trial_popul[i], popul[nearest_ind])   << ") : " << trial_popul[i].score << " " << previous_score << std::endl;
       popul[nearest_ind] = trial_popul[i];
       // int p;
       // std::cin >> p;
@@ -348,6 +450,7 @@ bool CrowdingMoverDE::select_population(const std::vector<Individual>& trial_pop
       best_idx = i;
       best = popul[best_idx].score;
       if (best < previous_best) {
+	previous_best = best;
 	new_best_found = true;
       }
     }
@@ -459,7 +562,7 @@ bool SharedMoverDE::select_population(const std::vector<Individual>& trial_popul
 
 void MoverDE::print_generation_information(int gen_count, bool new_best_found) {
 
-  std::cout << "[GEN] " << gen_count << " " << (-1 * SCORE_ERROR_FIXED) + best << " " << (-1 * SCORE_ERROR_FIXED) + (avg_acc / NP) << " at " << best_idx << " ";
+  std::cout << "[GEN] " << gen_count << " " << (-1 * SCORE_ERROR_FIXED) + best << " " << (-1 * SCORE_ERROR_FIXED) + (avg_acc / popul.size()) << " at " << best_idx << " ";
   //std::cout << "[GEN] " << gen_count << " " << best << " " << avg_acc / NP << " at " << best_idx << " ";
   std::cout << std::endl;
 
@@ -503,7 +606,7 @@ void HybridMoverDE::print_generation_information(int gen_count, bool new_best_fo
   std::cout << std::endl;
 
   std::cout << scfxn->print_stats() << std::endl;
-  std::cout << local_search->print_stats() << std::endl;
+  //  std::cout << local_search->print_stats() << std::endl;
   std::cout << "[TRIAL_SUC] " << trial_sucess_n << std::endl;
 
   if (getenv("PRINT_ALL") != NULL) {
@@ -518,100 +621,196 @@ void HybridMoverDE::print_generation_information(int gen_count, bool new_best_fo
 
 
 double MoverDE::score(Individual& ind) {
+#if(MPI_ENABLED)
+  return 1000;
+#else
   return scfxn->score(ind);
+#endif
+}
+
+int
+MoverDE::get_single_point_crossover(std::string ss) {
+  int n_res = (rand() % static_cast<int>(ss.size()) )  + 1;
+  while (ss[n_res] != 'L' || (n_res > (ss.size()) - 2) || (n_res < 2) ) {
+    n_res = (rand() % static_cast<int>(ss.size())
+ ) + 1;
+  }
+  int single_point_crossover = (n_res * 2) % D;
+  return single_point_crossover;
 }
 
 Individual MoverDE::sample_new_individual(int i, const Parents& p, std::vector<Individual> popul) {
   Individual trial(size());
-
+  int first_point = 0;
+  int second_point = 0;
   int n_res = 0;
-  for (int k = 0; k < D; ++k) {
-    if (k > 1 && k % 2 != 0 ) {
-      n_res++;
+  int single_point_crossover = get_single_point_crossover(popul[i].ss);
+  std::string ss = popul[0].ss;
+  if (crossover_strategy == "loops") {
+    std::vector<std::pair<int, int> > selected_regions = calculator_partial_rmsd->make_selected_regions();
+    std::vector<std::pair<int, int> > loop_regions;
+    for (int idx = 0; idx < selected_regions.size(); idx++) {
+      if (ss[selected_regions[idx].first] == 'L') {
+	loop_regions.push_back(selected_regions[idx]);
+      }
     }
+    std::pair<int, int> loop_cr = loop_regions[rand() % loop_regions.size() - 1];
+    first_point = loop_cr.first * 2 - 1;
+    second_point = loop_cr.second * 2 - 1;
+  }
+
+  for (int k = 0; k < D; ++k) {
+    if (k > 1 && k % 2 != 0 ) n_res++;
     double jrand = URAND();
-    //if ( ( jrand < CR ) && (popul[i].ss[n_res] != 'H') && (popul[i].ss[n_res] != 'E') ) {
-    if ( ( jrand < CR ) ) {
+    bool mutation = true;
+    if (crossover_strategy == "CR") {
+      mutation = jrand < CR;
+    } else {
+      if (crossover_strategy == "SPC") {
+	mutation = k < single_point_crossover;
+      }
+    }
+    bool mutation_only_loops = false;
+    if (mutation_strategy == "only_loops") {
+      mutation_only_loops = true;
+    }
+
+    if (crossover_strategy == "loops") {
+      if ( (k >= first_point) && (k <= second_point)) {
+	trial.vars[k] = popul[i].vars[k];
+	mutation = false;
+      }
+    }
+
+    if ( mutation ) {
       double diff =  popul[p.x2].vars[k] - popul[p.x3].vars[k];
       diff_avg_bef += std::abs(diff);
       while (diff > 1) { diff -= 1; }
       while (diff < -1) { diff += 1; }
       diff_avg_aft += std::abs(diff);
-      trial.vars[k] = popul[p.x1].vars[k] + F* (diff);
+      if (mutation_only_loops) {
+	if  (popul[p.x1].ss[n_res] == 'L')   {
+	  trial.vars[k] = popul[p.x1].vars[k] + F * (diff);
+	} else {
+	  trial.vars[k] = popul[p.x1].vars[k] + 0 * (diff);
+	}
+      } else {
+	trial.vars[k] = popul[p.x1].vars[k] + F * (diff);
+      }
 
-      //           std::cout << "n_res " << n_res << " " << popul[i].ss[n_res] <<  std::endl;
-      if (trial.vars[k] > DE_LIMIT) {
-      	trial.vars[k] = DE_LIMIT - std::abs(trial.vars[k] - DE_LIMIT);
-      }
-      if (trial.vars[k] < (-1*DE_LIMIT)) {
-      	trial.vars[k] = (-1) + std::abs(trial.vars[k] - (-1*DE_LIMIT));
-      }
-      
+      // //           std::cout << "n_res " << n_res << " " << popul[i].ss[n_res] <<  std::endl;
+      // if (trial.vars[k] > DE_LIMIT) {
+      // 	trial.vars[k] = DE_LIMIT - std::abs(trial.vars[k] - DE_LIMIT);
+      // }
+      // if (trial.vars[k] < (-1*DE_LIMIT)) {
+      // 	trial.vars[k] = (-1) + std::abs(trial.vars[k] - (-1*DE_LIMIT));
+      // }
+
     } else {
-      trial.vars[k] = popul[i].vars[k];
+      if (crossover_strategy != "loops") {
+	trial.vars[k] = popul[i].vars[k];
+      }
     }
   }
 
-  trial.omega = popul[p.x1].omega;
-  trial.ss = popul[p.x1].ss;
-
-  //  score(trial);
+  // for (int j = 0; j < trial.vars.size(); j++) {
+  //   if (trial.vars[j] != popul[i].vars[j]) {
+  //     std::cout << "-->  different vars at " << j << " :  " << trial.vars[j] <<  " != " << popul[i].vars[j] << std::endl;
+  //   }
+  // }
+  //trial.vars = popul[p.x1].vars;
+  if (CR > 0.5) {
+    trial.omega = popul[i].omega;
+    trial.ss = popul[i].ss;
+  } else {
+    trial.omega = popul[i].omega;
+    trial.ss = popul[i].ss;
+  }
+  double result = score(trial);
   return trial;
 }
 
 int MoverDE::size() { return D; }
 
+int MoverDE::get_best_rand_ind(int target, std::string select_parents_strategy) {
+   int module_val = 5;
+    if (select_parents_strategy == "best_ten") {
+      module_val = 10;
+    }
+    std::vector<std::pair<double, int> > a;
+
+    for (int i = 0 ; i < NP ; i++) {
+      a.push_back (make_pair (popul[i].score,i)); // k = value, i = original index
+    }
+    std::sort(a.begin(),a.end());
+    int rand_five = rand() % module_val;
+    do {
+      rand_five = rand() % module_val;
+    } while ( a[rand_five].second == target );
+
+    return rand_five;
+}
+
 void MoverDE::select_parents(int i, Parents& parent) {
-  do {
-    parent.x1 = rand() % NP;
-  } while (parent.x1 == i);
+  if (select_parents_strategy == "best") {
+    parent.x1 = best_idx;
+  }
+  if (select_parents_strategy == "rand") {
+    if (URAND() < 0.5) {
+      parent.x1 = best_idx;
+    } else {
+      do {
+	parent.x1 = rand() % NP;
+      } while (parent.x1 == i);
+    }
+  }
+  if ( (select_parents_strategy == "best_five") || ( select_parents_strategy == "best_ten") )  {
+    int best_rand_ind = get_best_rand_ind(i, select_parents_strategy );
+    parent.x1 = best_rand_ind;
+  }
+  if (select_parents_strategy == "nearest")  {
+    int nearest_ind = calculate_distances_popul->find_nearest(popul[i], popul, i, popul_pdb);
+    parent.x1 = nearest_ind;
+    if (parent.x1 == i) {
+      std::cout << "ERROR EN NEAREST" << std::endl;
+      int p;
+      std::cin >> p;
+    }
+  }
+
+  if (select_parents_strategy == "top_nearest") {
+   double temp;
+   std::vector<NeighStruct> aux(100);
+   std::vector<double> aux_2(100);
+   double value_dist_of_ind =  boost::dynamic_pointer_cast<CalculateEuclideanMarioPartialDistancePopulation>(calculate_distances_popul)->distance_of_individual_partial_mario_euclidean(popul_pdb[0],popul, temp,aux, aux_2);
+    std::vector<int> nearest_top_ind = calculate_distances_popul->find_top_nearest(popul[i], popul, i, popul_pdb);
+
+    int tam = nearest_top_ind.size();
+    do {
+      parent.x1 = nearest_top_ind[ rand() % tam ];
+    } while (parent.x1 == i);
+    do {
+      parent.x2 = nearest_top_ind[ rand() % tam ];
+    } while ((parent.x2 ==i) || (parent.x2 == parent.x1));
+
+    do {
+      parent.x3 = nearest_top_ind[ rand() % tam ];
+    } while ((parent.x3 == i) || (parent.x3 == parent.x2) || (parent.x3 == parent.x1));
 
 
-  //parent.x1 = best_idx;
-  do {
-    parent.x2 = rand() % NP;
-  } while ((parent.x2 ==i) || (parent.x2 == parent.x1));
+    //    std::cout << "x1 " << parent.x1 << " x2 " << parent.x2 << " x3 " << parent.x3 << std::endl;
 
-  do {
-    parent.x3 = rand() % NP;
-  } while ((parent.x3 == i) || (parent.x3 == parent.x2) || (parent.x3 == parent.x1));
-}
+  } else {
+    do {
+      parent.x2 = rand() % NP;
+    } while ((parent.x2 ==i) || (parent.x2 == parent.x1));
 
+    do {
+      parent.x3 = rand() % NP;
+    } while ((parent.x3 == i) || (parent.x3 == parent.x2) || (parent.x3 == parent.x1));
 
-void CrowdingMoverDE::select_parents(int i, Parents& parent) {
-  do {
-    parent.x1 = rand() % NP;
-  } while (parent.x1 == i);
-  do {
-    parent.x2 = rand() % NP;
-  } while ((parent.x2 ==i) || (parent.x2 == parent.x1));
+  }
 
-  do {
-    parent.x3 = rand() % NP;
-  } while ((parent.x3 == i) || (parent.x3 == parent.x2) || (parent.x3 == parent.x1));
-}
-
-
-void CrowdingHybridMoverDE::select_parents(int i, Parents& parent) {
-
-  // std::vector<int> nearest_inds = calculate_distances_popul->find_nearest_parent(i, popul[i], popul);
-
-  do {
-    parent.x1 = rand() % NP;
-  } while (parent.x1 == i);
-
-  // parent.x1 = best_idx;
-  // parent.x1 = nearest_inds[0];
-  // parent.x1 = nearest_inds[1];
-  // parent.x1 = nearest_inds[2];
-
-  do {
-    parent.x2 = rand() % NP;
-  } while ((parent.x2 ==i) || (parent.x2 == parent.x1));
-
-  do {
-    parent.x3 = rand() % NP;
-  } while ((parent.x3 == i) || (parent.x3 == parent.x2) || (parent.x3 == parent.x1));
 }
 
 
@@ -640,6 +839,21 @@ void SharedMoverDE::print_fitness_population(int gen_count) {
   }
 }
 
+void CrowdingHybridMoverDE::print_fitness_population(int gen_count) {
+  //if ((gen_count < 25) || (gen_count % 50 == 0)) {
+  if (true) {
+    std::cout << "[POP] ";
+    for (int i = 0; i < copy_popul_fitness_for_print.size(); i++) {
+      std::cout << (-1 * SCORE_ERROR_FIXED) + copy_popul_fitness_for_print[i].score << " ";
+    }
+    std::cout << std::endl;
+
+    // for (int i = 0; i < copy_popul_fitness_for_print.size(); i++) {
+    //   std::cout << "ind " << i << " : " << copy_popul_fitness_for_print[i].gen_acc << std::endl;
+    // }
+
+  }
+}
 
 void SharedMoverDE::print_distances_population() {
   //std::vector<double> ind_distance_avg = shared_fitness;
@@ -688,8 +902,8 @@ void SharedMoverDE::print_distances_population() {
     inter_distances_calc.add_occurrence(ind_inter_distance[i]);
   }
   //  std::cout << "min_inter_distance " << min_inter_distance << " max_inter_distance " << max_inter_distance << std::endl;
-  std::cout << "[INTER] ";
-  std::cout << inter_distances_calc.print_graph() << std::endl;
+  //std::cout << "[INTER] ";
+  //std::cout << inter_distances_calc.print_graph() << std::endl;
   /* END inter distances graphic */
 
   if (neighs_per_ind.size() > 0) {
@@ -718,30 +932,53 @@ void MoverDE::print_distances_population() {
   std::vector<double> rmsd_native = calculate_distances_popul->run_rmsd_to_native(popul);
   // std::vector<double> ind_inter_distance = result.distances_of_population;
 
-  std::cout << "[DIST_POP] ";
-  std::cout << " ";
-  //for (int i = 0; i < ind_distance_avg.size(); i++) {
-  for (int i = 0; i < 50; i++) {
-    std::cout << "1 ";
-  }
-  std::cout << std::endl;
-
-  InterDistancesGraph inter_distances_calc;
-
-  //for (int i = 0; i < ind_inter_distance.size(); i++) {
-    for (int i = 0; i < 10; i++) {
-            inter_distances_calc.add_occurrence(0);
-    }
-
-    std::cout << "[INTER] ";
-    std::cout << inter_distances_calc.print_graph() << std::endl;
-
-
   std::cout << "[RMSD_NATIVE] ";
-  for (int i = 0; i < NP; i++) {
+  for (int i = 0; i < popul.size(); i++) {
     std::cout << rmsd_native[i] << " ";
   }
   std::cout << std::endl;
+
+  // std::cout << "[DIST_POP] ";
+  // std::cout << " ";
+  // //for (int i = 0; i < ind_distance_avg.size(); i++) {
+  // for (int i = 0; i < 50; i++) {
+  //   std::cout << "1 ";
+  // }
+  // std::cout << std::endl;
+
+  // InterDistancesGraph inter_distances_calc;
+
+  // //for (int i = 0; i < ind_inter_distance.size(); i++) {
+  //   for (int i = 0; i < 10; i++) {
+  //           inter_distances_calc.add_occurrence(0);
+  //   }
+
+  //   std::cout << "[INTER] ";
+  //   std::cout << inter_distances_calc.print_graph() << std::endl;
+
+  std::vector<std::vector<double> > rmsd_native_all = calculator_partial_rmsd->partial_rmsd_of_population(popul);
+  std::string head = calculator_partial_rmsd->make_head(popul);
+  // [ {zona1}, {zona2}, {zona3}, {zona4} ],
+  // [ rmsd_native_all[0][zona_i].... ],
+  // [ rmsd_native_all[NP][zona_i].... ],
+  /*  std::cout << "[PARTIAL_RMSD] [ ";
+  std::cout << head << " , ";
+  int n_pieces = rmsd_native_all[0].size();
+  for (int i = 0; i < rmsd_native_all.size(); i++) {
+    std::cout << " [ ";
+    for (int j = 0; j < n_pieces; j++) {
+      if (j != n_pieces - 1) {
+	std::cout << rmsd_native_all[i][j] << " , ";
+      } else {
+	std::cout << rmsd_native_all[i][j] << " ] ";
+      }
+    }
+    if (i != rmsd_native_all.size() - 1) {
+      std::cout << " , ";
+    }
+  }
+  std::cout << " ] " << std::endl;
+  */
 }
 
 void MoverDE::print_individual_information(int gen_count, bool new_best_found) {
@@ -788,7 +1025,7 @@ void MoverDE::reset_stat() {
 }
 
 bool MoverDE::update_stat(int i, Individual ind, std::vector<Individual> popul) {
-  avg_acc += popul[i].score;
+  //  avg_acc += popul[i].score;
   bool result = false;
   if (popul[i].score < best) {
     best_idx = i;
@@ -817,47 +1054,19 @@ void SharedHybridMoverDE::apply() {
     double total_diff_avg_bef=0, total_diff_avg_aft = 0;
     diff_avg_bef=0; diff_avg_aft = 0;
 
-    //    LocalSearchIndividualMover prt_local_search = *local_search.get();
+    int cnt = 0;
+    double duration_acc = 0;
 
-#pragma omp parallel for  num_threads(3)
-    for (int i = 0; i < NP; ++i) {
-#pragma omp critical
-      local_search->apply(popul[i]);
-    }
-
+    apply_local_search_at_population();
+    calculate_distances_popul->build_pdb_population(popul,popul_pdb);
     for (int i = 0; i < NP; ++i) {
       select_parents(i, parents);
       Individual ind = sample_new_individual(i, parents, popul);
-      // diff_avg_bef = (diff_avg_bef / D);
-      // diff_avg_aft = (diff_avg_aft / D);
-      // total_diff_avg_bef += diff_avg_bef;
-      // total_diff_avg_aft += diff_avg_aft;
-      // if (CR > 0.5) {
-      // 	double new_rmsd = calculate_distances_popul->distance_between_inds(ind, popul[parents.x1]);
-      // 	//	std::cout << "rmsd parent " << i << " " << new_rmsd << std::endl;
-      // 	if (new_rmsd > global_max_rmsd) {
-      // 	  global_max_rmsd = new_rmsd;
-      // 	}
-      // 	if (new_rmsd < global_min_rmsd) {
-      // 	  global_min_rmsd = new_rmsd;
-      // 	}
-      // 	global_avg_rmsd += new_rmsd;
-      // } else {
-      // 	double new_rmsd = calculate_distances_popul->distance_between_inds(ind, popul[i]);
-      // 	std::cout << "rmsd parent " << i << " " << new_rmsd << std::endl;
-      // }
       trial_popul.push_back(ind);
     }
 
-#pragma omp parallel for  num_threads(3)
-    for (int i = 0; i < NP; ++i) {
-#pragma omp critical
-      score(trial_popul[i]);
-    }
+    trial_popul = mpi_calculator->run(trial_popul);
 
-    // std::cout << "[DIFF_AVG] " << (total_diff_avg_bef / NP) << " "  << (total_diff_avg_aft / NP) << std::endl;
-
-    // std::cout << "[RMSD_TRIALS] GEN " << gen_count << " { " << global_min_rmsd << " , " << global_max_rmsd << " } " << global_avg_rmsd / NP << std::endl;
 
     new_best_found = select_population(trial_popul);
 
@@ -866,6 +1075,138 @@ void SharedHybridMoverDE::apply() {
   }
 }
 
+
+void ResetOldIndsHybridDE::apply() {
+  gen_count = 0;
+  id = std::to_string( static_cast<int>(std::abs(rand())) );
+  Parents parents;
+  new_best_found = false;
+  std::cout << "init Reset Old DE for function " << scfxn->name() << std::endl;
+  std::vector<Individual> trial_popul;
+  double global_min_rmsd, global_max_rmsd, global_avg_rmsd;
+  while (gen_count < Gmax) {
+    reset_stat();
+    local_search->reset_stats();
+    trial_popul.resize(0);
+    global_min_rmsd = 100000;
+    global_max_rmsd = -100000;
+    global_avg_rmsd = 0;
+
+    double total_diff_avg_bef=0, total_diff_avg_aft = 0;
+    diff_avg_bef=0; diff_avg_aft = 0;
+
+    int cnt = 0;
+    double duration_acc = 0;
+    old_population = popul;
+
+    apply_local_search_at_population();
+    calculate_distances_popul->build_pdb_population(popul,popul_pdb);
+    for (int i = 0; i < NP; ++i) {
+      select_parents(i, parents);
+      Individual ind = sample_new_individual(i, parents, popul);
+      trial_popul.push_back(ind);
+    }
+
+    new_best_found = select_population(trial_popul);
+
+    clean_old_inds();
+
+    print_generation_information(gen_count, new_best_found);
+
+    ++gen_count;
+  }
+}
+
+void ResetOldIndsHybridDE::clean_old_inds() {
+    // clean old individuals
+  if (clean_inds_gen_limit < 100) {
+    for (int i = 0; i < NP; i++) {
+      if ( (i != best_idx) && ( popul[i].gen_acc >= clean_inds_gen_limit ) ) {
+	//if ( (i != best_idx) && ( popul[i].gen_acc >= clean_inds_gen_limit ) ) {
+	double prev_score = popul[i].score;
+	greedy_mover->apply(popul[i]);
+	popul[i].gen_acc = 0;
+	//	std::cout << "!!! RESET IND " << i  << " : " << (-1*SCORE_ERROR_FIXED) + prev_score << " to " <<  (-1*SCORE_ERROR_FIXED) +  popul[i].score << std::endl;
+      }
+    }
+  }
+}
+
+bool
+ResetOldIndsHybridDE::select_population(const std::vector<Individual>& trial_popul) {
+  trial_sucess_n = 0;
+ for (int i = 0; i < NP; i++) {
+    if (trial_popul[i].score < popul[i].score) {
+      popul[i] = trial_popul[i];
+      popul[i].gen_acc = 0;
+      trial_sucess_n++;
+      new_best_found = true;
+    }
+  }
+
+  best_idx = 0;
+  best = popul[best_idx].score;
+  for (int i = 0; i < popul.size(); i++) {
+    //std::cout << (-1 * SCORE_ERROR_FIXED) + popul[i].score << " ( "<< popul[i].score << " ) ";
+    avg_acc += popul[i].score;
+    if (popul[i].score < popul[best_idx].score) {
+      best_idx = i;
+      best = popul[best_idx].score;
+      if (best < previous_best) {
+	previous_best = best;
+	new_best_found = true;
+      }
+    }
+  }
+
+  return new_best_found;
+}
+
+bool
+ResetOldIndsCrowdingHybridDE::select_population(const std::vector<Individual>& trial_popul) {
+  trial_sucess_n = 0;
+  // Crowding DE: Rene Thomsen Algorithm
+  // 1. Each trial can be replace only its nearest individual if the energy is better
+  bool new_best_found = false;
+  double previous_best = popul[best_idx].score;
+  for (int i = 0; i < trial_popul.size(); i++) {
+    int nearest_ind = calculate_distances_popul->find_nearest(trial_popul[i], popul);
+    if ( trial_popul[i].score < popul[nearest_ind].score ) {
+      popul[nearest_ind] = trial_popul[i];
+      new_best_found = true;
+      trial_sucess_n++;
+      popul[nearest_ind].gen_acc = 0;
+    }
+  }
+  for (int i = 0; i < NP; i++) {
+    if (popul[i].score == old_population[i].score) {
+      popul[i].gen_acc = popul[i].gen_acc + 1;
+    }
+  }
+  avg_acc = 0;
+  //  best_idx = 0;
+  best = popul[best_idx].score;
+  //  std::cout << "check_popul ";
+  for (int i = 0; i < popul.size(); i++) {
+    //std::cout << (-1 * SCORE_ERROR_FIXED) + popul[i].score << " ( "<< popul[i].score << " ) ";
+    avg_acc += popul[i].score;
+    if (popul[i].score < popul[best_idx].score) {
+      best_idx = i;
+      best = popul[best_idx].score;
+      if (best < previous_best) {
+	previous_best = best;
+	new_best_found = true;
+      }
+    }
+  }
+  //std::cout << std::endl;
+  //std::cout << "best " << (-1 * SCORE_ERROR_FIXED) + best << " at " << best_idx << " " << popul[best_idx].score << std::endl;
+  return new_best_found;
+}
+
+void CrowdingHybridMoverDE::print_distances_population() {
+  MoverDE::print_distances_population();
+}
 
 // otra forma para sample individual
 /*      if (trial.vars[k] > DE_LIMIT) {
@@ -877,3 +1218,437 @@ void SharedHybridMoverDE::apply() {
 
 
  */
+
+#if(MPI_ENABLED)
+void MPICrowdingMoverDE::apply_local_search_at_population() {
+  if ((local_search_popul_module != 0) && ( gen_count % local_search_popul_module == 0) ) {
+    local_search->reset_stats();
+    double avg_before = 0;
+    for (int i = 0; i < NP; ++i) {
+      avg_before += (-1 * SCORE_ERROR_FIXED) + popul[i].score;
+    }
+    popul = mpi_calculator->run(popul);
+    double avg_after= 0;
+    for (int i = 0; i < NP; ++i) {
+      avg_after += (-1 * SCORE_ERROR_FIXED) + popul[i].score;
+    }
+    std::cout << local_search->print_stats() << " avg_before " << avg_before / NP << " avg_after " << avg_after / NP << std::endl;
+  }
+}
+
+void MPICrowdingMoverDE::analysis_of_population(std::vector<Individual> popul, std::vector<core::pose::PoseOP> popul_pdb){
+
+  int best_ind = 0;
+  int worst_ind = 0;
+  double best_value =popul[best_ind].score;
+  double worst_value = popul[worst_ind].score;
+  for (int i = 0; i < popul.size(); i++) {
+    if (popul[i].score < best_value) {
+      best_value = popul[i].score;
+      best_ind = i;
+    }
+     if (popul[i].score > worst_value) {
+      worst_value = popul[i].score;
+      worst_ind = i;
+    }
+  }
+
+   boost::dynamic_pointer_cast<CalculateEuclideanMarioPartialDistancePopulation>(calculate_distances_popul)->build_pdb_population(popul, popul_pdb);
+   boost::dynamic_pointer_cast<CalculateEuclideanMarioPartialDistancePopulation>(calculate_distances_popul)->build_inter_distances_of_population(popul);
+   double temp;
+   std::vector<NeighStruct> aux(100);
+   std::vector<double> aux_2(100);
+   double value_dist_of_ind =  boost::dynamic_pointer_cast<CalculateEuclideanMarioPartialDistancePopulation>(calculate_distances_popul)->distance_of_individual_partial_mario_euclidean(popul_pdb[best_ind],popul, temp,aux, aux_2);
+   //std::cout << "value dist " << value_dist_of_ind << std::endl;
+   //pose_distance_calculation(core::pose::Pose& pose1, core::pose::Pose& pose2)
+
+   double best_vs_worst_distance = boost::dynamic_pointer_cast<CalculateEuclideanMarioPartialDistancePopulation>(calculate_distances_popul)->pose_distance_calculation(popul_pdb[best_ind],popul_pdb[worst_ind]);
+
+   double best_native_distance = boost::dynamic_pointer_cast<CalculateEuclideanMarioPartialDistancePopulation>(calculate_distances_popul)->pose_distance_calculation(popul_pdb[best_ind],calculate_distances_popul->native_);
+
+   double worst_native_distance = boost::dynamic_pointer_cast<CalculateEuclideanMarioPartialDistancePopulation>(calculate_distances_popul)->pose_distance_calculation(calculate_distances_popul->native_,popul_pdb[worst_ind]);
+
+   std::cout << "[DIST_POPUL] ";
+   std::cout << "best ind " << best_ind << " " <<  (-1 * SCORE_ERROR_FIXED) + best_value << " ";
+   std::cout << "worst ind " << worst_ind << " " <<  (-1 * SCORE_ERROR_FIXED) + worst_value << " ";
+   std::cout << "best to native " << best_native_distance << " ";
+   std::cout << "worst to native " << worst_native_distance << " ";
+   std::cout << "best to worst " << best_vs_worst_distance << " ";
+   /*double diff =  std::abs(best_native_distance - worst_native_distance);
+
+   if (diff > 0) {
+       current_cde_radius = diff;
+   } else {
+	current_cde_radius = 1;
+   }*/
+
+   //current_cde_radius = 0.00303504;
+   //   current_cde_radius = 0.03;
+   std::cout << std::endl;
+   //   exit(1);
+}
+
+
+std::vector<std::vector<Individual> >
+MPISeedsMoverDE::create_seeds(std::vector<Individual> popul, std::vector<core::pose::PoseOP> popul_pdb) {
+
+  class IndIndex {
+  public:
+    int index_;
+    Individual ind_;
+    IndIndex(int index, Individual ind) : index_(index), ind_(ind) {}
+  };
+
+  class PopulSeedsComparer {
+  public:
+    PopulSeedsComparer() {}
+
+    bool operator() (IndIndex i, IndIndex j) {
+      return ( i.ind_.score < j.ind_.score );
+    }
+  };
+
+  std::vector<IndIndex> sort_popul_index;
+  for (int i = 0; i < popul.size(); i++) {
+    sort_popul_index.push_back(IndIndex(i, popul[i]));
+  }
+
+  std::vector<Individual> sort_popul = popul;
+  std::sort(sort_popul.begin(), sort_popul.end(), popul_comparer );
+  PopulSeedsComparer popul_seeds_comparer;
+  std::sort(sort_popul_index.begin(), sort_popul_index.end(), popul_seeds_comparer );
+
+  calculate_distances_popul->build_pdb_population(sort_popul, popul_pdb);
+  if (app_options.get<std::string>("Protocol.distance_strategy") == "euclidean_partial_mario") {
+  boost::dynamic_pointer_cast<CalculateEuclideanMarioPartialDistancePopulation>(calculate_distances_popul)->build_inter_distances_of_population(sort_popul);
+  }
+
+  std::vector<int> current_seed;
+  current_seed.push_back(sort_popul_index[0].index_);
+
+  //current_cde_radius = 0.03;
+  current_cde_radius = 7.0;
+  //  current_cde_radius = 0.01;
+  std::map<int, std::vector<int> > population_per_seed;
+  std::vector<int> processed_inds(sort_popul.size(), 0);
+  population_per_seed[current_seed[0]] = std::vector<int>();
+  population_per_seed[current_seed[0]].push_back( current_seed[0] );
+  for (int i = 1; i < sort_popul.size(); i++) {
+    if (processed_inds[sort_popul_index[i].index_] == 0) {
+      bool found = false;
+      for (int j = 0; j < current_seed.size() && !found; j++) {
+	double dist = 0;
+	if (app_options.get<std::string>("Protocol.distance_strategy") == "euclidean_partial_mario") {
+	  dist = boost::dynamic_pointer_cast<CalculateEuclideanMarioPartialDistancePopulation>(calculate_distances_popul)->pose_distance_calculation(popul_pdb[current_seed[j]],popul_pdb[i]);
+	} else {
+	  dist = calculate_distances_popul->current_distance_calculation(*popul_pdb[current_seed[j]],*popul_pdb[i]);
+	}
+	if ( dist <= current_cde_radius) {
+	  found = true;
+	  population_per_seed[current_seed[j]].push_back(sort_popul_index[i].index_);
+	  processed_inds[sort_popul_index[i].index_]  = 1;
+	  break;
+	}
+      }
+      if (!found) {
+	current_seed.push_back(sort_popul_index[i].index_);
+	processed_inds[sort_popul_index[i].index_]  = 1;
+	population_per_seed[sort_popul_index[i].index_] = std::vector<int>();
+	population_per_seed[sort_popul_index[i].index_].push_back(sort_popul_index[i].index_);
+      }
+    }
+  }
+
+  int min = 1000;
+  int min_index = 0;
+  // Limit current seeds to 3
+  int max_subpopuls = 3;
+  if (current_seed.size() > max_subpopuls) {
+    for (int i = max_subpopuls; i < current_seed.size(); i++) {
+      for (int j = 0; j < population_per_seed[current_seed[i]].size(); j++) {
+	for (int k = 0; k < max_subpopuls; k++) {
+	  double dist = 0;
+	  if (app_options.get<std::string>("Protocol.distance_strategy") == "euclidean_partial_mario") {
+	    dist = boost::dynamic_pointer_cast<CalculateEuclideanMarioPartialDistancePopulation>(calculate_distances_popul)->pose_distance_calculation(popul_pdb[current_seed[k]], popul_pdb[population_per_seed[current_seed[i]][j]] );
+	  } else {
+	    dist = calculate_distances_popul->current_distance_calculation(*popul_pdb[current_seed[k]], *popul_pdb[population_per_seed[current_seed[i]][j]] );
+	  }
+
+	  if (dist < min) {
+	    min = dist;
+	    min_index = k;
+	  }
+	}
+	population_per_seed[current_seed[min_index]].push_back(population_per_seed[current_seed[i]][j]);
+      }
+    }
+    current_seed.resize(max_subpopuls);
+  }
+
+
+  //std::cout << std::endl;
+  std::cout << "[CURRENT_SEEDS] ";
+  for (int i = 0; i < current_seed.size(); i++) {
+    std::cout << i << " : " << popul[current_seed[i]].score << " , ";
+  }
+  std::cout << std::endl;
+
+  std::vector<std::vector<Individual> > subpopuls;
+  int count = 0;
+  for (int i = 0; i < current_seed.size(); i++) {
+    //     std::cout << "SEED " << current_seed[i] << " : " <<  popul[current_seed[i]].score << std::endl;
+
+     subpopuls.push_back(std::vector<Individual>());
+    for (int j = 0; j < population_per_seed[current_seed[i]].size(); j++) {
+      //std::cout << "\t" << population_per_seed[current_seed[i]][j] << " : " <<  popul[population_per_seed[current_seed[i]][j]].score << std::endl ;
+      subpopuls[i].push_back(popul[population_per_seed[current_seed[i]][j]]);
+      count++;
+    }
+  }
+  //std::cout << std::endl;
+  //  std::cout << "total processed elements " << count << std::endl;
+  for (int i = 0; i < subpopuls.size(); i++) {
+
+    //subpopuls[i] = mpi_calculator->run( subpopuls[i], 1 );
+    std::vector<double> rmsd_subpopul = calculate_distances_popul->run_rmsd_to_native(subpopuls[i]);
+    std::cout << "subpopul " << i << " energy [";
+    for (int j = 0; j < subpopuls[i].size(); j++) {
+      if (j == subpopuls[i].size() - 1) {
+	std::cout << " " << subpopuls[i][j].score << " ";
+      }else {
+	std::cout << " " << subpopuls[i][j].score << " ,";
+      }
+    }
+
+    std::cout << "]" << std::endl;
+
+    std::cout << "subpopul " << i << " rmsd [";
+    for (int j = 0; j < subpopuls[i].size(); j++) {
+      if (j == subpopuls[i].size() - 1) {
+	std::cout << " " << rmsd_subpopul[j] << " ";
+      }else {
+	std::cout << " " << rmsd_subpopul[j] << " ,";
+      }
+    }
+    std::cout << "]" << std::endl;
+  }
+
+  //create subpopuls
+  int m_size = popul.size() * 2;
+  int ind_size = popul[0].vars.size();
+  for (int i = 0; i < subpopuls.size(); i++) {
+    while (subpopuls[i].size() < m_size) {
+      Individual nuevo(ind_size);
+      init_popul_->disturb_individual(nuevo, ind_size);
+      subpopuls[i].push_back(nuevo);
+    }
+
+    for (int j = 1; j < subpopuls[i].size(); j++) {
+      if (std::abs(subpopuls[i][0].score - subpopuls[i][j].score) > 0.01) {
+	 init_popul_->disturb_individual(subpopuls[i][j], ind_size);
+      }
+    }
+  }
+
+  // score & print subpopuls
+  for (int i = 0; i < subpopuls.size(); i++) {
+    subpopuls[i] = mpi_calculator->run( subpopuls[i], 1 );
+  }
+
+  return subpopuls;
+}
+
+
+void MPISeedsMoverDE::apply() {
+  gen_count = 0;
+  id = std::to_string( static_cast<int>(std::abs(rand())) );
+  Parents parents;
+  new_best_found = false;
+  std::cout << "init MPI Seeds Mover " << scfxn->name() << std::endl;
+  std::vector<Individual> trial_popul;
+  std::vector<Individual> main_popul = popul;
+  int Gmax_in = 10;
+  int my_gen_count = 0;
+  int main_NP = NP;
+  std::vector<Individual> result_popul;
+  while (my_gen_count < 10) {
+    result_popul.resize(0);
+    reset_stat();
+    trial_popul.resize(0);
+    apply_local_search_at_population();
+    calculate_distances_popul->build_pdb_population(popul,popul_pdb);
+    //analysis_of_population(popul, popul_pdb);
+    std::vector<std::vector<Individual> > subpopuls = create_seeds(popul, popul_pdb);
+
+    std::vector<Individual> super_popul;
+    result_popul.resize(0);
+    for (int i = 0; i < subpopuls.size(); i++) {
+      NP = main_NP;
+      std::cout << "start for subpopul " << i << " size " << subpopuls[i].size() << " best " << subpopuls[i][0].score << std::endl;
+      MoverDE::apply(subpopuls[i], subpopuls[i].size(), 2 );
+      std::sort(subpopuls[i].begin(), subpopuls[i].end(), popul_comparer);
+
+      // result_popul.push_back(subpopuls[i][0]);
+      // subpopuls[i].erase(subpopuls[i].begin());
+      for (int j = 0; j < subpopuls[i].size(); j++) {
+	super_popul.push_back(popul[j]);
+      }
+
+    }
+
+    // std::sort(super_popul.begin(), super_popul.end(), popul_comparer);
+    // for (int i = result_popul.size(); i < main_NP; i++) {
+    //   result_popul.push_back(super_popul[i]);
+    // }
+
+    // takes one ind per subpopul until completes the main popul
+    while(result_popul.size() < main_NP) {
+      for (int i = 0; i < subpopuls.size() && result_popul.size() < main_NP; i++) {
+	result_popul.push_back(subpopuls[i][0]);
+	subpopuls[i].erase(subpopuls[i].begin());
+      }
+    }
+
+    std::sort(result_popul.begin(), result_popul.end(), popul_comparer);
+    if (popul[best_idx].score > result_popul[0].score) {
+      new_best_found = true;
+    }
+
+    best_idx = 0;
+    result_popul.resize(main_NP);
+    main_popul = result_popul;
+    popul = result_popul;
+    copy_popul_fitness_for_print = popul;
+    best = popul[best_idx].score;
+    avg_acc  = 0;
+    for (int i = 0; i < popul.size(); i++) {
+      avg_acc += popul[i].score;
+    }
+
+    print_generation_information(my_gen_count, new_best_found);
+    ++my_gen_count;
+    ++gen_count;
+  }
+}
+
+void MPICrowdingMoverDE::apply() {
+  gen_count = 0;
+  id = std::to_string( static_cast<int>(std::abs(rand())) );
+  Parents parents;
+  new_best_found = false;
+  std::cout << "init MPI Crowding Mover " << scfxn->name() << std::endl;
+  std::vector<Individual> trial_popul;
+  double global_min_rmsd, global_max_rmsd, global_avg_rmsd;
+  bool equal_value = false;
+  while (gen_count < Gmax && !equal_value) {
+    reset_stat();
+    trial_popul.resize(0);
+    global_min_rmsd = 100000;
+    global_max_rmsd = -100000;
+    global_avg_rmsd = 0;
+    apply_local_search_at_population();
+
+    calculate_distances_popul->build_pdb_population(popul,popul_pdb);
+
+    //analysis_of_population(popul, popul_pdb);
+
+    for (int i = 0; i < NP; ++i) {
+      select_parents(i, parents);
+      Individual ind = sample_new_individual(i, parents, popul);
+      //      trial_popul.push_back(ind);
+      trial_popul.push_back(popul[i]);
+    }
+
+    bool test_gecco2015_only_score_individuals = false;
+    if (test_gecco2015_only_score_individuals) {
+       	trial_popul = mpi_calculator->run(trial_popul, 1);
+    } else {
+	trial_popul = mpi_calculator->run(trial_popul);
+    }
+
+    new_best_found = select_population(trial_popul);
+
+	double avg_acc = 0;
+    for (int p = 0; p < popul.size(); p++) {
+	avg_acc += popul[p].score;
+	std::cout << "ind "<< p << " : " << (-1 * SCORE_ERROR_FIXED) + trial_popul[p].score << std::endl;
+	}
+	avg_acc = avg_acc / popul.size();
+
+	if (std::abs(avg_acc - popul[best_idx].score) < 0.1) {
+	   equal_value = true;
+	}
+
+    if (false) {
+      // quiero imprimir el score vs rmsd de cada Individuo que me importa para mostrarlos en una grafica.
+      double best_rmsd = 0;
+      int nearest = calculate_distances_popul->find_nearest(trial_popul[best_idx], popul);
+      std::vector<double> rmsd_native_popul = calculate_distances_popul->run_rmsd_to_native(popul);
+      std::vector<double> rmsd_native_trial = calculate_distances_popul->run_rmsd_to_native(trial_popul);
+      std::cout << "[BEST_IND_ANALYSIS] { best : ( " << (-1 * SCORE_ERROR_FIXED) + popul[best_idx].score << ", " << rmsd_native_popul[best_idx] << " ) , " << " ";
+      std::cout << "trial : (" << (-1 * SCORE_ERROR_FIXED) + trial_popul[best_idx].score << " , " << rmsd_native_trial[best_idx] << ") , " << " ";
+      std::cout << "parents : [ (" << (-1 * SCORE_ERROR_FIXED) + popul[parents.x1].score <<"," <<rmsd_native_popul[parents.x1] << " ) , "  << "(" << (-1 * SCORE_ERROR_FIXED) + popul[parents.x2].score <<"," <<rmsd_native_popul[parents.x2] << " ), " << "(" << (-1 * SCORE_ERROR_FIXED) + popul[parents.x3].score <<"," <<rmsd_native_popul[parents.x3] << " ) ] , "  << " ";
+      std::cout << "nearest : (" << (-1 * SCORE_ERROR_FIXED) + popul[nearest].score << "," << rmsd_native_popul[nearest]  << " ) } " << std::endl;
+
+    }
+    print_generation_information(gen_count, new_best_found);
+    ++gen_count;
+  }
+}
+
+double SharedHybridMoverDE::score(Individual& ind) {
+  return 1;
+}
+
+
+
+double MPICrowdingMoverDE::score(Individual& ind) {
+  return 1;
+}
+
+double MPIResetOldCrowdingHybridDE::score(Individual& ind) {
+  return 1;
+}
+void MPIResetOldCrowdingHybridDE::apply() {
+  gen_count = 0;
+  id = std::to_string( static_cast<int>(std::abs(rand())) );
+  Parents parents;
+  new_best_found = false;
+  std::cout << "init MPI Reset Old Crowding Mover " << scfxn->name() << std::endl;
+  std::vector<Individual> trial_popul;
+  double global_min_rmsd, global_max_rmsd, global_avg_rmsd;
+  while (gen_count < Gmax) {
+    reset_stat();
+    trial_popul.resize(0);
+    global_min_rmsd = 100000;
+    global_max_rmsd = -100000;
+    global_avg_rmsd = 0;
+
+    old_population = popul;
+    apply_local_search_at_population();
+    for (int i = 0; i < NP; ++i) {
+      if (popul[i].score < old_population[i].score ) {
+	popul[i].gen_acc = 0;
+      }
+    }
+    old_population = popul;
+
+    calculate_distances_popul->build_pdb_population(popul,popul_pdb);
+    for (int i = 0; i < NP; ++i) {
+      select_parents(i, parents);
+      Individual ind = sample_new_individual(i, parents, popul);
+      trial_popul.push_back(ind);
+    }
+
+    trial_popul = mpi_calculator->run(trial_popul);
+    new_best_found = select_population(trial_popul);
+
+    clean_old_inds();
+
+    print_generation_information(gen_count, new_best_found);
+    ++gen_count;
+  }
+}
+
+
+#endif

@@ -1,9 +1,9 @@
 #include <iostream>
+#include <iostream>
 #include <devel/init.hh>
 #include <core/pose/Pose.hh>
 #include <vector>
 #include <string>
-
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
 
@@ -22,9 +22,26 @@ void init_rosetta() {
   devel::init(aux_argv.size() - 1, aux_argv.data());
 }
 
+void show_options_file_in_log(std::string file_name) {
+  std::string line;
+  std::cout << "[OPTIONS_FILE_USED]" << std::endl;
+  std::ifstream myfile(file_name);
+  if (myfile.is_open()) {
+    while ( std::getline (myfile,line) ) {
+      if (line.size() > 0) {
+	  if (line[0] != '#') std::cout << line << '\n';
+        }
+      }
+      myfile.close();
+    }
+  std::cout << "[END_OPTIONS_FILE]" << std::endl;
+}
+
 void run_operator(int argc, char** argv) {
   boost::property_tree::ptree pt;
   boost::property_tree::ini_parser::read_ini(std::string(argv[1]), pt);
+
+  show_options_file_in_log(argv[1]);
 
   std::cout << pt.get<std::string>("Protocol.stages") << std::endl;
   std::cout << pt.get<std::string>("Protocol.distance_strategy") << std::endl;

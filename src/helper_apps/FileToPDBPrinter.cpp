@@ -205,8 +205,8 @@ FileToPDBPrinter::print_at_screen() {
 
 void
 FileToPDBPrinter::init_differential_evolution() {
-  //de = boost::shared_ptr<DE_Operator>(new DE_Operator(configuration["prot"]));
-  de = boost::shared_ptr<DE_Operator>(new DE_Operator("1elwA"));
+  de = boost::shared_ptr<DE_Operator>(new DE_Operator(configuration["prot"]));
+  //  de = boost::shared_ptr<DE_Operator>(new DE_Operator("1elwA"));
   core::scoring::ScoreFunctionOP scorefxn = core::scoring::ScoreFunctionFactory::create_score_function(std::string("score3").c_str());
   de->frag_opt.scorefxn = scorefxn;
   de->frag_opt.stage_name = std::string("stage4");

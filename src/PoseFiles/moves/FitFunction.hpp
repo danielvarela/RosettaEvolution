@@ -9,7 +9,57 @@
 #include <core/scoring/ScoreFunction.hh>
 #include <boost/shared_ptr.hpp>
 
-typedef std::map<std::string, double> FuncStats;
+
+
+template<class K, class V>
+class MyFuncStatsMap : public std::map<K, V>
+{
+public:
+  std::map<std::string, double> stats;
+
+  MyFuncStatsMap() {}
+
+  double& operator[](std::string index) {
+    return stats[index];
+  }
+
+  void clear() {
+    stats.clear();
+  }
+
+  std::map<std::string, double>::iterator find( const std::string& key ) {
+    return stats.find(key);
+  }
+
+
+  void increment(std::string stat_name) {
+    if (stats.find(stat_name) != stats.end()) {
+	stats[stat_name]++;
+      } else {
+	stats[stat_name] = 1;
+      }
+  }
+
+  void record(std::string stat_name, double value) {
+  if (stats.find(stat_name) != stats.end()) {
+	stats[stat_name] += value;
+      } else {
+	stats[stat_name] = value;
+      }
+  }
+
+  double obtain(std::string stat_name) {
+    double value;
+    if (stats.find(stat_name) != stats.end()) {
+      value = stats[stat_name];
+    } else {
+      value = 0;
+    }
+    return value;
+  }
+};
+
+typedef MyFuncStatsMap<std::string, double> FuncStats;
 
 class FitFunction
 {
@@ -24,6 +74,9 @@ public:
 
   virtual double score(Individual& ind) = 0;
   virtual int D() = 0;
+  void set_name(std::string input) {
+    name_ = input;
+  }
   virtual std::string name() = 0;
 
   virtual double lim() = 0;
