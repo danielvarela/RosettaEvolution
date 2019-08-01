@@ -39,8 +39,10 @@ or
 
 
 ```
-mpirun -np $RosettaEvolution/bin/mpi_app options.ini
+mpirun -np X $RosettaEvolution/bin/mpi_app options.ini
 ```
+
+where $X$ is the number of processes to run the application.
 
 
 # Protein Structure Prediction
