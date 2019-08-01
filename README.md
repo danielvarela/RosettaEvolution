@@ -29,7 +29,24 @@ cmake ..
 build mpi_app
 ```
 
-to run the code, modify the options.ini file with your input files and exec the app with:
+
+## Basic Usage
+
+First, you should include the protein input files in the code. Modify the file src/Controller/ProteinInfoArchive.cpp following one of the existing examples. For example:
+
+```cpp
+Protinfo c8c;
+c8c.name = "1c8cA";
+c8c.pdb_file = "./input_files/info_1c8cA/vf_1c8c.pdb";
+c8c.frag_3 = "./input_files/info_1c8cA/boinc_vf_aa1c8cA03_05.200_v1_3";
+c8c.frag_9 = "./input_files/info_1c8cA/boinc_vf_aa1c8cA09_05.200_v1_3";
+c8c.ss_file = "./input_files/info_1c8cA/vf_1c8cA.psipred_ss2";
+prot_selection["1c8cA"] = c8c;
+```
+
+Compile the code and modify the options.ini in order to indicate the input protein that you selected. 
+
+Use the command line:
 
 ```
 $RosettaEvolution/bin/mpi_app options.ini
@@ -42,7 +59,7 @@ or
 mpirun -np X $RosettaEvolution/bin/mpi_app options.ini
 ```
 
-where $X$ is the number of processes to run the application.
+where *X* is the number of processes to run the application.
 
 
 # Protein Structure Prediction
