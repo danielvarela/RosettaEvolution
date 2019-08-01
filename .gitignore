@@ -1,16 +1,40 @@
-#ignore everything
-*
+# Ignore everything
 
-# but not ignore
-!.gitignore
-!README.md
-!*.cpp
-!*.hpp
-!*src/
-!src/PoseFiles/
-!src/PoseFiles/moves/
-!src/helper_apps/
-!*pyscripts/
-!*input_files/
+.gitignore
 
-CMakeLists.txt
+input_files/
+bin/
+build/
+*.mrc
+measure*log
+*log
+*out
+error*
+
+BenchmarkFirstCrowding*
+ArchiveExperiments*
+ArchiveFirstBenchmark*
+
+GNUParallel.sh
+extra_run_tests.sh
+extra_run_tests.sh.save
+options_short.ini
+run_density.sh
+run_tests.sh
+*.sh
+
+options_*ini
+run*sh
+*pdb
+*.tar.gz
+
+all_info/
+*.csv
+.csv
+options_dir/
+input*
+*mrc
+*pdb
+core*
+error*out
+nmpi*out
