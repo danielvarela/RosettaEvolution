@@ -1,5 +1,5 @@
 
-# Artificial intelligence methods applied to protein folding with 2D lattice
+# AI methods applied to protein folding with Rosetta Software Suite
 
 My PhD research project focuses on the computational modeling of the protein folding process. The goal is to obtain
 the three-dimensional structure of the protein only with the amino acid sequence information (ab initio) by using evolutionary computing, artificial life techniques and complex systems theory methods. Since the structure defines the function of a protein, this would allow a computational drug design. More information about the protein structure prediction problem can be found at Wikipedia. More information about my research can be found at my publications or, in case of more detailed information, please, feel free to contact me.
