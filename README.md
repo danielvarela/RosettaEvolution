@@ -65,8 +65,14 @@ where *X* is the number of processes to run the application.
 # Protein Structure Prediction
 
 n this work Differential Evolution (DE) was combined with fragment replacement for improving the search of protein structure conformations with minimum energy. The Rosetta environment was used, employing some of its phases for the ab initio prediction in the initialization of the genetic population, as well as its fragment-assembly technique. DE provides a global search in the multimodal energy landscape whereas fragment replacement based on the Monte-Carlo procedure provides a useful search of short protein conformations that accelerates the DE search. Initial results with proteins from PDB with a comparison with previous works are provided.
+
+## Differential Evolution
+
+Differential Evolution [Price05] is a population-based search method. DE creates new candidate solutions by combining existing ones according to a simple formula of vector crossover and mutation, and then keeping whichever candidate solution has the best score or fitness on the optimization problem at hand.
+
+![Differential Evolution Scheme](https://github.com/danielvarela/RosettaEvolution/blob/master/images/DE_scheme.png)
  
-# List of Publications
+## List of Publications
 
 In order to know more about the methods used at this project, please, find the detailed information in the following publications:
 
