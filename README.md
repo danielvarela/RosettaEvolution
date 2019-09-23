@@ -1,10 +1,10 @@
 
-# AI methods applied to protein folding with Rosetta Software Suite
+# Evolutionary Computation methods applied to protein structure prediction and protein folding modeling with the Rosetta Software Suite
 
-My PhD research project focuses on the computational modeling of the protein folding process. The goal is to obtain
-the three-dimensional structure of the protein only with the amino acid sequence information (ab initio) by using evolutionary computing, artificial life techniques and complex systems theory methods. Since the structure defines the function of a protein, this would allow a computational drug design. More information about the protein structure prediction problem can be found at Wikipedia. More information about my research can be found at my publications or, in case of more detailed information, please, feel free to contact me.
+My research focuses on the protein structure prediction problem and on computational modeling of the protein folding process. In the formerm, the goal is to obtain
+the three-dimensional structure of the protein only with the amino acid sequence information (ab initio prediction) by using evolutionary computation methods. Since the structure defines the function of a protein, this would allow a computational drug design. More information about the protein structure prediction problem can be found at Wikipedia. More information about my research can be found at my publications or, in case of more detailed information, please, feel free to contact me.
 
-This project is a C++ implementation using the Rosetta Software Suite tool. A simplificated version is implemented at python implementation the same methods but with a simple 2D lattice and known python libraries. [2D_protein_AI](https://github.com/danielvarela/2D_protein_AI).
+This project is a C++ implementation using the Rosetta Software Suite tool. A simplified version is implemented in python implementation the same methods but with a simple 2D lattice and known python libraries. [2D_protein_AI](https://github.com/danielvarela/2D_protein_AI).
 
 ### Dependencies
 
@@ -64,7 +64,7 @@ where *X* is the number of processes to run the application.
 
 # Protein Structure Prediction
 
-n this work Differential Evolution (DE) was combined with fragment replacement for improving the search of protein structure conformations with minimum energy. The Rosetta environment was used, employing some of its phases for the ab initio prediction in the initialization of the genetic population, as well as its fragment-assembly technique. DE provides a global search in the multimodal energy landscape whereas fragment replacement based on the Monte-Carlo procedure provides a useful search of short protein conformations that accelerates the DE search. Initial results with proteins from PDB with a comparison with previous works are provided.
+n this work Differential Evolution (DE) was combined with fragment replacement for improving the search of protein structure conformations with minimum energy. The Rosetta environment was used, employing some of its phases for the ab initio prediction in the initialization of the genetic population, as well as its fragment-assembly technique. DE provides a global search in the multimodal energy landscape whereas fragment replacement based on the Monte-Carlo procedure provides a useful local search that locally refines protein conformations and that accelerates the DE search.
 
 ## Differential Evolution
 
