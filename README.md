@@ -70,7 +70,7 @@ n this work Differential Evolution (DE) was combined with fragment replacement f
 
 Differential Evolution [Price05] is a population-based search method. DE creates new candidate solutions by combining existing ones according to a simple formula of vector crossover and mutation, and then keeping whichever candidate solution has the best score or fitness on the optimization problem at hand.
 
-![Differential Evolution Scheme](https://github.com/danielvarela/RosettaEvolution/blob/master/images/DE_scheme.png)
+![Differential Evolution Scheme](https://github.com/danielvarela/RosettaEvolution/blob/master/images/DE_scheme_improved.PNG)
  
 ## List of Publications
 
