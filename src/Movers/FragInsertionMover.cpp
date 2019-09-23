@@ -228,9 +228,9 @@ StageRosettaSampler::apply( core::pose::Pose &pose ) {
   stage4_cycles_ = 25;
  */ 
 
-  stage2_cycles_ = stage2_cycles_ * 0.1;
-  stage3_cycles_ = stage3_cycles_ * 0.1;
-  stage4_cycles_ = stage4_cycles_ * 0.1;
+  stage2_cycles_ = stage2_cycles_ * 10;
+  stage3_cycles_ = stage3_cycles_ * 10;
+  stage4_cycles_ = stage4_cycles_ * 10;
 
   if (rosetta_stage == "stage2") {
     prepare_stage2( pose );

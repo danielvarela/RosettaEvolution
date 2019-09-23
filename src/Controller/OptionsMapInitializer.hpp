@@ -86,9 +86,9 @@ namespace OptionsMapInitializer
     std::map<std::string, int> gmax_per_stage;
     if (option == "default") {
       gmax_per_stage["stage1"] = 30;
-      gmax_per_stage["stage2"] = 100;
-      gmax_per_stage["stage3"] = 100;
-      gmax_per_stage["stage4"] = 100;
+      gmax_per_stage["stage2"] = 10;
+      gmax_per_stage["stage3"] = 10;
+      gmax_per_stage["stage4"] = 10;
     } else {
       if (option == "short_test") {
 	      gmax_per_stage["stage1"] = 10;
