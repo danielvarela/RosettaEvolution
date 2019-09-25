@@ -169,7 +169,7 @@ The distance functions used are located in file "src/Movers/CalculateDistancePop
 
 ### Fitness Sharing 
 
-The fitness sharing (FS) niching method was also integrated into DE to define a SharingDE version, following the implementation defined by Thomsen [3]. The basic idea of FS is to punish individuals that occupy the same area of the search space, rescaling the fitness of each encoded solution considering the number of individuals in its neighbourhood. The implementation in class ***SharedMoverDE*** modifies the "select_population" function.  
+The fitness sharing (FS) niching method was also integrated into DE to define a SharingDE version, following the implementation defined by Thomsen [3]. The basic idea of FS is to punish individuals that occupy the same area of the search space, rescaling the fitness of each encoded solution considering the number of individuals in its neighbourhood. The implementation in class **SharedMoverDE** modifies the "select_population" function.  
 
 The implementation uses a SharedFitnessIndividual class defined in "src/Algorithm/DifferentialEvolutionMover.hpp". 
 
