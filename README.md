@@ -72,6 +72,7 @@ Differential Evolution [Price05] is a population-based search method. DE creates
 
 ![Differential Evolution Scheme](https://github.com/danielvarela/RosettaEvolution/blob/master/images/DE_scheme_improved.PNG)
  
+## Code description 
  
 The code includes the integration of classic niching methods (crowding, fitness sharing and speciation) into a hybrid version of Differential Evolution (DE) for protein structure prediction. For protein representation, the Rosetta coarse-grained representation model was used. Rosetta is one of the most successful software environments for protein design [7]. The hybrid DE version incorporates the Rosetta fragment replacement technique as a local search operator. 
 
