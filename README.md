@@ -205,39 +205,17 @@ Proceedings of the Companion Publication of the 2015 on Genetic and Evolutionary
 
 In order to know more about the methods used at this project, please, find the detailed information in the following publications: 
 
-* Crowding Differential Evolution for Protein Structure Prediction
-From Bioinspired Systems and Biomedical Applications to Machine Learning
-2019 | book-chapter
-DOI: 10.1007/978-3-030-19651-6_19
+* Varela, D. and Santos, J. (2019), "Crowding differential evolution for protein structure prediction", *Proceedings International Work-Conference on the Interplay between Natural and Artificial Computation - IWINAC 2019*, *Lecture Notes in Computer Science* 11487:193-203. DOI: 10.1007/978-3-030-19651-6_19
 
+* Varela, D. and Santos, J. (2018), "Automatically obtaining a cellular automaton scheme for modeling protein folding using the FCC model", *Natural Computing*, DOI: 10.1007/s11047-018-9705-y.
 
-* Automatically obtaining a cellular automaton scheme for modeling protein folding using the FCC model
-Natural Computing
-2018-08 | journal-article
-DOI: 10.1007/s11047-018-9705-y
+* Varela, D. and Santos, J. (2017), "A hybrid evolutionary algorithm for protein structure prediction using the Face-Centered Cubic lattice model", *Proceedings International Conference on Neural Information Processing ICONIP*, *Lecture Notes in Computer Science*, 10634:628-638. DOI: 10.1007/978-3-319-70087-8_65
 
-
-* A Hybrid Evolutionary Algorithm for Protein Structure Prediction Using the Face-Centered Cubic Lattice Model
-Neural Information Processing
-2017 
-DOI: 10.1007/978-3-319-70087-8_65
-
-* A protein folding model using the face-centered cubic lattice model
-Proceedings of the Genetic and Evolutionary Computation Conference Companion on - GECCO '17
-2017 
+* Varela, D. and Santos, J. (2017), "A protein folding model using the Face-Centered Cubic lattice model", *GECCO 2017 ACM Proceedings Companion, Workshop Evolutionary Computation in Computational Biology, Genetic and Evolutionary Computation Conference*, 1674-1678. 
 DOI: 10.1145/3067695.3082543
 
-* Protein Folding Modeling with Neural Cellular Automata Using the Face-Centered Cubic Model
-Natural and Artificial Computation for Biomedicine and Neuroscience
-2017 
-DOI: 10.1007/978-3-319-59740-9_13
+* Varela, D. and Santos, J. (2017), "Protein folding modeling with neural cellular automata using the Face-Centered Cubic model", *Proceedings International Work-Conference on the Interplay between Natural and Artificial Computation*, *Lecture Notes in Computer Science*, 10337:125-134. DOI: 10.1007/978-3-319-59740-9_13
 
-* Protein Folding Modeling with Neural Cellular Automata Using Rosetta
-Proceedings of the 2016 on Genetic and Evolutionary Computation Conference Companion - GECCO '16 Companion
-2016 
-DOI: 10.1145/2908961.2931720
+* Varela, D. and Santos, J. (2016), "Protein folding modeling with neural cellular automata using Rosetta", *GECCO 2016 ACM Proceedings Companion, Workshop Evolutionary Computation in Computational Structural Biology, Genetic and Evolutionary Computation Conference*, 1307-1312. DOI: 10.1145/2908961.2931720
 
-* Combination of Differential Evolution and Fragment-based Replacements for Protein Structure Prediction
-Proceedings of the Companion Publication of the 2015 on Genetic and Evolutionary Computation Conference - GECCO Companion '15
-2015
-DOI: 10.1145/2739482.2768437
+* Varela, D. and Santos, J. (2015), "Combination of differential evolution and fragment-based replacements for protein structure prediction", *GECCO 2015 ACM Proceedings Companion, Workshop Evolutionary Computation in Computational Structural Biology, Genetic and Evolutionary Computation Conference*, 911-914. DOI: 10.1145/2739482.2768437
