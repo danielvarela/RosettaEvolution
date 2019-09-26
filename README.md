@@ -114,8 +114,8 @@ The classic implementation of Differential Evolution [3] is used, following the 
  
 ```cpp
 MoverDE::apply() 
-std::vector<Individual> popul; // initial population 
 
+std::vector<Individual> popul; // initial population 
 while (gen_count < Gmax) { 
      reset_stat();
      trial_popul.resize(0);
