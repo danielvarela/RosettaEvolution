@@ -1,11 +1,10 @@
 
 # Evolutionary Computation methods applied to protein structure prediction and protein folding modeling with the Rosetta Software Suite
 
-My research focuses on the protein structure prediction problem and on computational modeling of the protein folding process. In the formerm, the goal is to obtain
-the three-dimensional structure of the protein only with the amino acid sequence information (ab initio prediction) by using evolutionary computation methods. Since the structure defines the function of a protein, this would allow a computational drug design. More information about the protein structure prediction problem can be found at Wikipedia. More information about my research can be found at my publications or, in case of more detailed information, please, feel free to contact me.
+My research focuses on the protein structure prediction problem and on the computational modeling of the protein folding process. In the former, the goal is to obtain the three-dimensional structure of the protein only with the amino acid sequence information (ab initio prediction) by using evolutionary computation methods. Since the structure defines the function of a protein, this would allow a computational drug design. More information about the protein structure prediction problem can be found at Wikipedia. More information about my research can be found at my publications or, in case of more detailed information, please, feel free to contact me. 
 
-This project is a C++ implementation using the Rosetta Software Suite tool. A simplified version is implemented in python implementation the same methods but with a simple 2D lattice and known python libraries. [2D_protein_AI](https://github.com/danielvarela/2D_protein_AI).
-
+ This project is a C++ implementation using the Rosetta Software suite tool.  
+ 
 ### Dependencies
 
 * icc 2018.5.274 ( Intel Compiler)
@@ -64,7 +63,7 @@ where *X* is the number of processes to run the application.
 
 # Protein Structure Prediction
 
-In this work Differential Evolution (DE) was combined with fragment replacement for improving the search of protein structure conformations with minimum energy. The Rosetta environment was used, employing some of its phases for the ab initio prediction in the initialization of the genetic population, as well as its fragment-assembly technique. DE provides a global search in the multimodal energy landscape whereas fragment replacement based on the Monte-Carlo procedure provides a useful local search that locally refines protein conformations and that accelerates the DE search.
+In this work Differential Evolution (DE) was combined with fragment replacement for improving the search of protein structure conformations with minimum energy. The Rosetta environment was used, employing its coarse-grained representation and its fragment-assembly technique. DE provides a global search in the multimodal energy landscape whereas the fragment replacement technique, with a Metropolis Monte-Carlo procedure, provides a useful local search that locally refines protein conformations and that accelerates the DE search.
 
 ## Differential Evolution
 
@@ -74,13 +73,13 @@ Differential Evolution [1] is a population-based search method. DE creates new c
  
 ## Code description 
  
-The code includes the integration of classic niching methods (crowding, fitness sharing and speciation) into a hybrid version of Differential Evolution (DE) for protein structure prediction. For protein representation, the Rosetta coarse-grained representation model was used. Rosetta is one of the most successful software environments for protein design [5]. The hybrid DE version incorporates the Rosetta fragment replacement technique as a local search operator. 
+The code includes the integration of classic niching methods (crowding, fitness sharing and speciation) into a hybrid version of Differential Evolution (DE) for protein structure prediction. For protein representation, the Rosetta coarse-grained representation model was used. Rosetta is one of the most successful software environments for protein design [5]. The hybrid DE version incorporates the Rosetta fragment replacement technique as a local search operator.  
 
-Given the inaccuracies of the Rosetta energy model, the inclusion of niching allows the simultaneous search in different areas of the energy landscape that correspond to different minima, with the aim to obtain a diversified set of optimized (native-like) folds. 
+Given the inaccuracies of the Rosetta energy model, the inclusion of niching allows the simultaneous search in different areas of the energy landscape that correspond to different minima, with the aim to obtain a diversified set of optimized (native-like) folds.  
 
 ## Source code tree: 
 
-In the “src” directory, the code used can be found, with the following structure: 
+In the “src” directory, the code used can be found, with the following structure:  
 
 * ***main.cpp*** 
 
@@ -110,7 +109,7 @@ The implementations of Differential Evolution and the niching algorithms (crowdi
 
 ### Differential Evolution 
 
-The classic implementation of Differential Evolution [1] is used, following the scheme of the previous figure. The source code can be found in class **MoverDE**, which is used as a base class for the rest of the implementations. The main function of the file is called apply. Those names follow the code guidelines of the Rosetta code.   
+The classic implementation of Differential Evolution [3] is used, following the scheme of the previous figure. The source code can be found in class **MoverDE**, which is used as a base class for the rest of the implementations. The main function of the file is called apply. Those names follow the code guidelines of the Rosetta code.  
 
  
 ```cpp
@@ -137,9 +136,9 @@ while (gen_count < Gmax) {
 
 ### Differential Evolution with fragments replacement 
 
-As it is defined in our preliminary work [2], we combined the global search of Differential Evolution with Rosetta’s fragment replacement.  Fragment replacements can be considered as a local search since it locally refines the dihedral angles of a conformation. More information can be found in [3]. 
+As it is defined in our preliminary work [2], we combined the global search of Differential Evolution with Rosetta’s fragment replacement.  Fragment replacement techniquecan be considered as a local search since it locally refines the dihedral angles of a conformation. More information can be found in [3].  
 
-The corresponding class is named as **HybridMoverDE**. The fragment replacement operation is controlled with a boolean variable "frags_at_popul", which, in this class, is always set to True.  The code of the HybridMoverDE is the same as the **MoverDE**, but using the appropriate function of the MPI parallelized version for evaluating the fitness of the individuals of the population. 
+The corresponding class is named as **HybridMoverDE**. The fragment replacement operation is controlled with a boolean variable "frags_at_popul", which, in this class, is always set to True.  The code of the HybridMoverDE is the same as the **MoverDE**, but using the appropriate function of the MPI parallelized version for evaluating the fitness of the individuals of the population.  
 
 ```cpp
 HybridMoverDE::apply()
@@ -148,7 +147,7 @@ HybridMoverDE::apply()
 
 ### Crowding 
 
-The integration of the crowding niching method and DE, defined by Thomsen [6], was followed, extending DE with the classic crowding scheme.  The implementation is in class **CrowdingMoverDE**,  which replaces the base function "select_population". Now, instead of comparing each trial individual with its corresponding individual in the population, the trial individual is compared against its nearest neighbour (most similar) among a subset of the population. For this reason, a distance function is needed in order to differentiate protein folds and find the most similar individual. 
+The integration of the crowding niching method and DE, defined by Thomsen [6], was followed, extending DE with the classic crowding scheme.  The implementation is in class **CrowdingMoverDE**, which replaces the base function "select_population". Now, instead of comparing each trial individual with its corresponding individual in the population, the trial individual is compared against its nearest neighbour (most similar) among a subset of the population. For this reason, a distance function is needed in order to differentiate protein folds and find the most similar individual.  
 
  
 ```cpp
@@ -164,21 +163,21 @@ for (int i = 0; i < trial_popul.size(); i++) {
 ```
  
 
-The distance functions used are located in file "src/Movers/CalculateDistancePopulation.cpp". Three functions are used: 1. Root Mean Square Deviation (RMSD), 2. The structural diversity measure (SDM) defined by Garza-Fabre et al [4], which describes the relative position of each pair of secondary structure elements with respect of each other and 3. The Template Modeling score (TM-score) defined by Zhang et al [8]. 
+The distance functions used are located in file "src/Movers/CalculateDistancePopulation.cpp". Three functions are used: 1. Root Mean Square Deviation (RMSD), 2. The structural diversity measure (SDM) defined by Garza-Fabre et al [4], which describes the relative position of each pair of secondary structure elements with respect of each other and 3. The Template Modeling score (TM-score) defined by Zhang et al [8].  
 
 
 ### Fitness Sharing 
 
-The fitness sharing (FS) niching method was also integrated into DE to define a SharingDE version, following the implementation defined by Thomsen [6]. The basic idea of FS is to punish individuals that occupy the same area of the search space, rescaling the fitness of each encoded solution considering the number of individuals in its neighbourhood. The implementation in class **SharedMoverDE** modifies the "select_population" function.  
+The fitness sharing (FS) niching method was also integrated into DE to define a SharingDE version, following the implementation defined by Thomsen [6]. The basic idea of FS is to punish individuals that occupy the same area of the search space, rescaling the fitness of each encoded solution considering the number of individuals in its neighbourhood. The implementation in class **SharedMoverDE** modifies the "select_population" function.   
 
-The implementation uses a SharedFitnessIndividual class defined in "src/Algorithm/DifferentialEvolutionMover.hpp". 
+The implementation uses a **SharedFitnessIndividual** class defined in "src/Algorithm/DifferentialEvolutionMover.hpp". 
 
 
 ### Speciation 
 
-The species-based DE (SDE) defined by Li [7] was used as base in our approach. In SDE, each of the "species" is built around a dominating species’ seed. All individuals that fall within the radius from the species seed are identified as the same species. Since DE mutation is carried out within each species, the technique has the ability to maintain high diversity and stable niches over generations. 
+The species-based DE (SDE) defined by Li [7] was used as base in our approach. In SDE, each of the "species" is built around a dominating species’ seed. All individuals that fall within the radius from the species seed are identified as the same species. Since DE mutation is carried out within each species, the technique has the ability to maintain high diversity and stable niches over generations.  
 
-The class **SeedsMoverDE** defines the code used for this SDE version. As all the other classes, the apply function carries out the main operations of the algorithm. In this case, it makes use of a new function "create_seeds", which is responsible for creating the different populations of species.
+The class **SeedsMoverDE** defines the code used for this SDE version. As all the other classes, the apply function carries out the main operations of the algorithm. In this case, it makes use of a new function "create_seeds", which is responsible for creating the different populations of species. 
 
 
 ## References 
@@ -204,7 +203,7 @@ Proceedings of the Companion Publication of the 2015 on Genetic and Evolutionary
 
 ## List of Publications
 
-In order to know more about the methods used at this project, please, find the detailed information in the following publications:
+In order to know more about the methods used at this project, please, find the detailed information in the following publications: 
 
 * Crowding Differential Evolution for Protein Structure Prediction
 From Bioinspired Systems and Biomedical Applications to Machine Learning
