@@ -75,7 +75,10 @@ Differential Evolution [1] is a population-based search method. DE creates new c
  
 The code includes the integration of classic niching methods (crowding, fitness sharing and speciation) into a hybrid version of Differential Evolution (DE) for protein structure prediction. For protein representation, the Rosetta coarse-grained representation model was used. Rosetta is one of the most successful software environments for protein design [5]. The hybrid DE version incorporates the Rosetta fragment replacement technique as a local search operator.  
 
-Given the inaccuracies of the Rosetta energy model, the inclusion of niching allows the simultaneous search in different areas of the energy landscape that correspond to different minima, with the aim to obtain a diversified set of optimized (native-like) folds.  
+Given the inaccuracies of the Rosetta energy model, the inclusion of niching allows the simultaneous search in different areas of the energy landscape that correspond to different minima, with the aim to obtain a diversified set of optimized (native-like) folds.
+
+The code of the different niching methods (crowding, fitness sharing, speciation) integrated with the hybrid DE algorithm was parallelized in MPI (Message Passage Interface), with a main master process that distributes the population of individuals, in equal size chunks, to different slave processes in order to evaluate the fitness of each individual.
+
 
 ## Source code tree: 
 
