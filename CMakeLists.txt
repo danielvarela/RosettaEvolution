@@ -6,9 +6,9 @@ set (CMAKE_CXX_STANDARD 11)
 # Rosetta flags for compatibility
 ############ Build Type, Mode, Link Rules, Compiler, Extras
 SET(EXTRAS cxx11)
-SET(MODE release)
+SET(MODE debug)
 SET(LINK_RULES shared)
-SET(CMAKE_BUILD_TYPE release)
+SET(CMAKE_BUILD_TYPE Debug)
 
 SET(CC gcc)
 SET(CXX g++)
@@ -31,7 +31,8 @@ if (OPENMP_FOUND)
   set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
 endif()
 
-find_package(Boost 1.68.0 COMPONENTS serialization mpi REQUIRED )
+
+find_package(Boost 1.61.0 COMPONENTS serialization mpi REQUIRED )
 if(Boost_FOUND)
    message(STATUS "Boost target found: " ${BOOST_ROOT})
    message("Boost_FOUND" ${BOOST_FOUND})
@@ -44,31 +45,62 @@ endif()
 #SET(CMAKE_C_COMPILER mpicc)
 #SET(CMAKE_CXX_COMPILER mpicxx)
 
+REMOVE_DEFINITIONS(-DPTR_MODERN)
+REMOVE_DEFINITIONS(-DPTR_BOOST)
+
+ADD_DEFINITIONS(-DCXX11)
+ADD_DEFINITIONS(-DPTR_STD)
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ../bin/)
+SET(CMAKE_INSTALL_PREFIX ../bin/)
+
 
 find_package(MPI)
 
 
-set(INCLUDE_ROSETTA_LIST 
-  /home/ulc/co/dvm/intel/ism/rm/rosetta2018/main/source/src
-  /home/ulc/co/dvm/intel/ism/rm/rosetta2018/main/source/external/include
-  #/opt/cesga/easybuild-cesga/software/Core/icc/2018.5.274/include/
-  /home/ulc/co/dvm/intel/ism/rm/rosetta2018/main/source/src/platform/linux/
-  /home/ulc/co/dvm/intel/ism/rm/rosetta2018/main/source/external/dbio
-  /home/ulc/co/dvm/intel/ism/rm/rosetta2018/main/source/external/libxml2/include
+# set(INCLUDE_ROSETTA_LIST 
+#   /home/ulc/co/dvm/intel/ism/rm/rosetta2018/main/source/src
+#   /home/ulc/co/dvm/intel/ism/rm/rosetta2018/main/source/external/include
+#   #/opt/cesga/easybuild-cesga/software/Core/icc/2018.5.274/include/
+#   /home/ulc/co/dvm/intel/ism/rm/rosetta2018/main/source/src/platform/linux/
+#   /home/ulc/co/dvm/intel/ism/rm/rosetta2018/main/source/external/dbio
+#   /home/ulc/co/dvm/intel/ism/rm/rosetta2018/main/source/external/libxml2/include
+#   /usr/include
+#   /usr/local/include)
+	
+# set(LINK_ROSETTA_LIST 
+#   "/home/ulc/co/dvm/intel/ism/rm/rosetta2018/main/source/external/lib"
+#   "/home/ulc/co/dvm/intel/ism/rm/rosetta2018/main/source/cmake/build_cxx11/"
+#   "/home/ulc/co/dvm/intel/ism/rm/rosetta2018/main/source/src"
+#   "/home/ulc/co/dvm/intel/ism/rm/rosetta2018/main/source/external"
+#   "/usr/local/lib"
+#   "/home/ulc/co/dvm/intel/ism/rm/rosetta2018/main/source/external/lib" 
+#   "/home/ulc/co/dvm/intel/ism/rm/rosetta2018/main/source/src"
+#   "/home/ulc/co/dvm/intel/ism/rm/rosetta2018/main/source/external"
+#   "/opt/cesga/easybuild-cesga/software/Core/icc/2018.5.274/lib/"
+#   )
+
+set(INCLUDE_ROSETTA_LIST /home/dvarela/Code/rosetta/main/source/src
+  /home/dvarela/Code/rosetta/main/source/external/include
+  /home/dvarela/Code/rosetta/main/source/src/platform/linux/64/gcc/7
+  /home/dvarela/Code/rosetta/main/source/src/platform/linux/64/gcc
+  /home/dvarela/Code/rosetta/main/source/src/platform/linux/64
+  /home/dvarela/Code/rosetta/main/source/src/platform/linux
+#  /home/dvarela/Code/rosetta/main/source/external/boost_1_55_0
+  /home/dvarela/Code/rosetta/main/source/external/libxml2/include
+  /home/dvarela/Code/rosetta/main/source/external
+  /home/dvarela/Code/rosetta/main/source/external/dbio
   /usr/include
   /usr/local/include)
 	
-set(LINK_ROSETTA_LIST 
-  "/home/ulc/co/dvm/intel/ism/rm/rosetta2018/main/source/external/lib"
-  "/home/ulc/co/dvm/intel/ism/rm/rosetta2018/main/source/cmake/build_cxx11/"
-  "/home/ulc/co/dvm/intel/ism/rm/rosetta2018/main/source/src"
-  "/home/ulc/co/dvm/intel/ism/rm/rosetta2018/main/source/external"
-  "/usr/local/lib"
-  "/home/ulc/co/dvm/intel/ism/rm/rosetta2018/main/source/external/lib" 
-  "/home/ulc/co/dvm/intel/ism/rm/rosetta2018/main/source/src"
-  "/home/ulc/co/dvm/intel/ism/rm/rosetta2018/main/source/external"
-  "/opt/cesga/easybuild-cesga/software/Core/icc/2018.5.274/lib/"
-  )
+set(LINK_ROSETTA_LIST "/home/dvarela/Code/rosetta/main/source/external/lib"
+  "/home/dvarela/Code/rosetta/main/source/cmake/build_cxx11/"
+  "/home/dvarela/Code/rosetta/main/source/src"
+  "/home/dvarela/Code/rosetta/main/source/build/external/debug/linux/4.4/64/x86/gcc/7/static"
+  "/home/dvarela/Code/rosetta/main/source/external"
+  "/usr/lib/"
+  "/usr/local/lib")
+
 
 
 # My app source files

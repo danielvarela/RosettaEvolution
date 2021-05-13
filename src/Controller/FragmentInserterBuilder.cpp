@@ -131,14 +131,6 @@ FragmentInserterBuilder::get(std::string input_option, FragInsertionStrategy::Fr
     strategy_return = FragInsertionStrategy::get(FragInsertionStrategy::FragMoverTypes::stage_rosetta_mover, frag_opt);
     break;
   }
-  case hybrid_mover: {
-    strategy_return = FragInsertionStrategy::get(FragInsertionStrategy::FragMoverTypes::hybrid_mover, frag_opt);
-    break;
-  }
-  case ILS_as_julia: {
-    strategy_return = FragInsertionStrategy::get(FragInsertionStrategy::FragMoverTypes::ILS_as_julia, frag_opt);
-    break;
-  }
   default:
     std::cout << "no insertion strategy option" << std::endl;
     exit(1);
