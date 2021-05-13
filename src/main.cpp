@@ -1,48 +1,18 @@
 #include <iostream>
+#include <iostream>
 #include <devel/init.hh>
-
-#include "mpi.h"
-#include <boost/mpi.hpp>
-#include <boost/serialization/vector.hpp>
+#include <core/pose/Pose.hh>
+#include <vector>
+#include <string>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
-#include <vector>
-#include <map>
-#include <string>
-#include <core/pose/Pose.hh>
-namespace mpi = boost::mpi;
 
-#include "Controller/DE_Operator.hpp"
-#include "MpiFiles/UtilsMPI.hpp"
-#include "MpiFiles/WorkerProcess.hpp"
+#include "PoseFiles/DEoperator.hpp"
+#include "PoseFiles/moves/DifferentialEvolutionMover.hpp"
+#include "PoseFiles/moves/CalculateRmsdDistancePopulation.hpp"
 
-#define BOOST_DATE_TIME_NO_LIB
-#define NUMBER_OF_JOBS 12
-
-
-// Includes
-#include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/date_time/local_time_adjustor.hpp>
-#include <boost/date_time/c_local_time_adjustor.hpp>
-#include <boost/optional/optional.hpp>
-
-void
-init_rosetta(int res) {
-  std::string init_flags = "@flags";
-  switch (res) {
-  case 2: {
-    init_flags = "@flags_2"; break;
-  }
-  case 5: {
-    init_flags = "@flags_5"; break;
-  }
-  case 10: {
-    init_flags = "@flags_10"; break;
-  }
-  default:
-    init_flags = "@flags"; break;
-  }
-  std::vector<std::string> arguments = {"./bin/mpi", init_flags};
+void init_rosetta() {
+  std::vector<std::string> arguments = {"./bin/app", "@flags"};
   std::vector<char*> aux_argv;
   for (const auto& arg : arguments) {
    aux_argv.push_back((char*)arg.data());
@@ -67,41 +37,63 @@ void show_options_file_in_log(std::string file_name) {
   std::cout << "[END_OPTIONS_FILE]" << std::endl;
 }
 
-
-boost::shared_ptr<DE_Operator>
-run_operator(int argc, char** argv) {
+void run_operator(int argc, char** argv) {
   boost::property_tree::ptree pt;
-  boost::property_tree::ini_parser::read_ini(std::string(argv[argc - 1]), pt);
+  boost::property_tree::ini_parser::read_ini(std::string(argv[1]), pt);
+
+  show_options_file_in_log(argv[1]);
+
+  std::cout << pt.get<std::string>("Protocol.stages") << std::endl;
+  std::cout << pt.get<std::string>("Protocol.distance_strategy") << std::endl;
+  init_rosetta();
   std::string prot_name = pt.get<std::string>("Protocol.prot");
-  int map_res = pt.get<int>("Protocol.map_res");
-  init_rosetta(map_res);
-  return boost::shared_ptr<DE_Operator>(new DE_Operator(prot_name, pt) );
+  DE_Operator my_app(prot_name, pt);
+
+  std::cout << " Test differential Evolution Riken " << std::endl;
+  std::cout << "protname " << prot_name << std::endl;
+  std::cout << "protocol " << pt.get<std::string>("Protocol.name") << std::endl;
+  my_app.run();
 }
 
-int
-main(int argc, char** argv) {
-  using boost::posix_time::ptime;
-  using boost::posix_time::second_clock;
-  using boost::posix_time::to_simple_string;
-  using boost::gregorian::day_clock;
+#include "./helper_apps/FileToPDBPrinter.hpp"
+
+void codified_angles_to_pdb(int argc, char** argv) {
+  // init_rosetta();
+  // FileToPDBPrinter::print(argv[1]);
+}
+
+void run_score(int argc, char** argv) {
+ //  devel::init(argc, argv);
+  init_rosetta();
+  std::cout << " Score protein " << std::string(argv[2]) << std::endl;
+  DE_Operator my_app = DE_Operator(std::string(argv[2]));
+
+  //  my_app.init_files(my_app.prot_selection[std::string(argv[2])]);
+
+  core::pose::PoseOP native_ = my_app.get_native_pose();
+
+  core::pose::Pose input_pdb;
+  read_pose(std::string(argv[3]), input_pdb);
+
+  core::scoring::ScoreFunctionOP scorefxn3 = core::scoring::ScoreFunctionFactory::create_score_function(std::string("score3").c_str());
+
+  std::cout << "score3 for input_pdb is " << (*scorefxn3)(input_pdb) << std::endl;
+  std::cout << "rmsd for input_pdb is " << core::scoring::CA_rmsd(input_pdb, *native_) << std::endl;
+
+}
+
+int main(int argc, char *argv[]) {
+  bool score = false;
+  std::cout << "init " << std::endl;
   srand ( time(NULL) );
-  mpi::environment env(argc, argv);
-  mpi::communicator world;
 
+  //  codified_angles_to_pdb(argc, argv);
 
-  if (world.rank() == 0) {
-    boost::shared_ptr<DE_Operator> app_operator = run_operator(argc, argv);
-    show_options_file_in_log(argv[argc - 1]);
-    app_operator->run();
-    for (int i = 1; i < world.size(); i++) {
-      world.send(i, 0, STOP_TAG);
-    }
-    ptime todayUtc(day_clock::universal_day(), second_clock::universal_time().time_of_day());
-    std::cout << "time " << to_simple_string(todayUtc) << std::endl;
+  if (score) {
+    run_score(argc, argv);
   } else {
-    boost::shared_ptr<DE_Operator> app_operator = run_operator(argc, argv);
-    WorkerProcess(app_operator).run();
-    //WorkerProcessScatterGather(app_operator).run();
-    //WorkerProcessEvaluateAndNearest(app_operator).run();
+    run_operator(argc, argv);
   }
+
+  return 0;
 }

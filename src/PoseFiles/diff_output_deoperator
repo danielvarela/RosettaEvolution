@@ -1,0 +1,546 @@
+*** /home/dvarela/Code/RosettaEvolution/src/PoseFiles/DEoperator.cpp	2019-02-13 16:49:01.602297149 +0100
+--- /tmp/ediff23037UHZ	2019-03-04 17:50:13.336829512 +0100
+***************
+*** 5,64 ****
+  #include <stdlib.h>     /* exit, EXIT_FAILURE **/
+  
+  #include "DEoperator.hpp"
+- #include <protocols/electron_density/SetupForDensityScoringMover.hh>
+- #include <core/scoring/electron_density/ElectronDensity.hh>
+  
+! #include "../mpi_files/MasterRosettaCalculator.hpp"
+! 
+!   class PrintRMSDvsMarioAnalisys
+    {
+    public:
+!     class PrintRow
+!     {
+!     public:
+!       int i;
+!       int j;
+!       double rmsd;
+!       double euc;
+! 
+!       PrintRow() : i(0), j(0), rmsd(0), euc(0) {}
+!       PrintRow(int i_, int j_, double rmsd_, double euc_ ) : i(i_), j(j_), rmsd(rmsd_), euc(euc_) {
+!       }
+!       std::string print() {
+! 	return std::string("[" + std::to_string(rmsd) + "," + std::to_string(euc) + "]" );
+!       }
+!     };
+  
+!     CalculateDistancePopulationPtr calculate_partial_rmsd, calculate_partial_euc;
+!     std::vector<PrintRow> printable;
+! 
+!     PrintRMSDvsMarioAnalisys( CalculateDistancePopulationPtr calculate_partial_rmsd_, CalculateDistancePopulationPtr calculate_partial_euc_  ) : calculate_partial_rmsd(calculate_partial_rmsd_), calculate_partial_euc(calculate_partial_euc_) {
+      }
+  
+!     void apply(std::vector<Individual> popul) {
+!       std::vector<core::pose::PoseOP> popul_pdb;
+!       popul_pdb.resize(popul.size());
+!       calculate_partial_rmsd->build_pdb_population(popul,popul_pdb);
+!       boost::dynamic_pointer_cast<CalculateEuclideanMarioPartialDistancePopulation>(calculate_partial_euc)->build_pdb_population(popul, popul_pdb);
+!       boost::dynamic_pointer_cast<CalculateEuclideanMarioPartialDistancePopulation>(calculate_partial_euc)->build_inter_distances_of_population(popul);
+!       double euc = 0, rmsd = 0;
+!       printable.resize(0);
+!       for (int i = 0; i < popul.size() / 2 - 1; i++) {
+! 	for (int j = i; j < popul.size() / 2; j++) {
+! 	  euc = boost::dynamic_pointer_cast<CalculateEuclideanMarioPartialDistancePopulation>(calculate_partial_euc)->pose_distance_calculation(popul_pdb[i], popul_pdb[j]);
+! 	  rmsd = calculate_partial_rmsd->current_distance_calculation(*popul_pdb[i], *popul_pdb[j] );
+! 	  PrintRow r(i, j, rmsd, euc);
+! 	  printable.push_back(r);
+! 	}
+!       }
+  
+!       std::cout << "[MARIO_PAIRS] ";
+!       for (int i = 0; i < printable.size(); i++) {
+! 	std::cout << std::string(printable[i].print() + " ; ");
+        }
+-       std::cout << std::endl;
+      }
+!   };
+  
+  
+  
+--- 5,61 ----
+  #include <stdlib.h>     /* exit, EXIT_FAILURE **/
+  
+  #include "DEoperator.hpp"
+  
+! class PrintRMSDvsMarioAnalisys
+! {
+! public:
+!   class PrintRow
+    {
+    public:
+!     int i;
+!     int j;
+!     double rmsd;
+!     double euc;
+  
+!     PrintRow() : i(0), j(0), rmsd(0), euc(0) {}
+!     PrintRow(int i_, int j_, double rmsd_, double euc_ ) : i(i_), j(j_), rmsd(rmsd_), euc(euc_) {
+!     }
+!     std::string print() {
+!       return std::string("[" + std::to_string(rmsd) + "," + std::to_string(euc) + "]" );
+      }
++   };
+  
+!   CalculateDistancePopulationPtr calculate_partial_rmsd, calculate_partial_euc;
+!   std::vector<PrintRow> printable;
+! 
+!   PrintRMSDvsMarioAnalisys( CalculateDistancePopulationPtr calculate_partial_rmsd_, CalculateDistancePopulationPtr calculate_partial_euc_  ) : calculate_partial_rmsd(calculate_partial_rmsd_), calculate_partial_euc(calculate_partial_euc_) {
+!   }
+  
+!   void apply(std::vector<Individual> popul) {
+!     std::vector<core::pose::PoseOP> popul_pdb;
+!     popul_pdb.resize(popul.size());
+!     calculate_partial_rmsd->build_pdb_population(popul,popul_pdb);
+!     boost::dynamic_pointer_cast<CalculateEuclideanMarioPartialDistancePopulation>(calculate_partial_euc)->build_pdb_population(popul, popul_pdb);
+!     boost::dynamic_pointer_cast<CalculateEuclideanMarioPartialDistancePopulation>(calculate_partial_euc)->build_inter_distances_of_population(popul);
+!     double euc = 0, rmsd = 0;
+!     printable.resize(0);
+!     for (int i = 0; i < popul.size() / 2 - 1; i++) {
+!       for (int j = i; j < popul.size() / 2; j++) {
+! 	euc = boost::dynamic_pointer_cast<CalculateEuclideanMarioPartialDistancePopulation>(calculate_partial_euc)->pose_distance_calculation(popul_pdb[i], popul_pdb[j]);
+! 	rmsd = calculate_partial_rmsd->current_distance_calculation(*popul_pdb[i], *popul_pdb[j] );
+! 	PrintRow r(i, j, rmsd, euc);
+! 	printable.push_back(r);
+        }
+      }
+! 
+!     // std::cout << "[MARIO_PAIRS] ";
+!     // for (int i = 0; i < printable.size(); i++) {
+!     //   std::cout << std::string(printable[i].print() + " ; ");
+!     // }
+!     // std::cout << std::endl;
+! 
+!   }
+! };
+  
+  
+  
+***************
+*** 72,86 ****
+    score_per_stage["stage4"] = "score3";
+  
+    // gmax_per_stage;
+!   gmax_per_stage["stage1"] = 30;
+    gmax_per_stage["stage2"] = 10;
+!   gmax_per_stage["stage3"] = 10;
+!   gmax_per_stage["stage4"] = 10;
+! 
+!   // gmax_per_stage["stage1"] = 30;
+!   // gmax_per_stage["stage2"] = 10;
+!   // gmax_per_stage["stage3"] = 190;
+!   // gmax_per_stage["stage4"] = 100000;
+  
+    distances_map["error"] = dist_error;
+    distances_map["rmsd"] = rmsd;
+--- 69,83 ----
+    score_per_stage["stage4"] = "score3";
+  
+    // gmax_per_stage;
+! /*  gmax_per_stage["stage1"] = 30;
+    gmax_per_stage["stage2"] = 10;
+!   gmax_per_stage["stage3"] = 190;
+!   gmax_per_stage["stage4"] = 100000;
+! */
+!   gmax_per_stage["stage1"] = 20;
+!   gmax_per_stage["stage2"] = 100;
+!   gmax_per_stage["stage3"] = 100;
+!   gmax_per_stage["stage4"] = 100;
+  
+    distances_map["error"] = dist_error;
+    distances_map["rmsd"] = rmsd;
+***************
+*** 151,163 ****
+  
+  void
+  DE_Operator::init_protein_archive() {
+-   // Protinfo sap;
+-   // sap.name = "1sap";
+-   // sap.pdb_file = "./1sap_A.pdb";
+-   // sap.map_file = "./4054.map";
+-   // sap.frag_3 = "./frag3";
+-   // sap.frag_9 = "./frag9";
+-   // sap.ss_file = "./1sapA.ss2";
+  
+    Protinfo j9s;
+    j9s.name = "3j9s";
+--- 148,153 ----
+***************
+*** 213,219 ****
+    opd.frag_9 = "./input_files/info_1opd/boinc_vf_aa1opd_09_05.200_v1_3";
+    opd.ss_file = "./input_files/info_1opd/vf_1opd_.psipred_ss2";
+  
+!   Protinfo rnbA;
+    rnbA.name = "1rnbA";
+    rnbA.pdb_file = "./input_files/info_1rnbA/vf_1rnb.pdb";
+    rnbA.map_file = "./emd_6272.map";
+--- 203,219 ----
+    opd.frag_9 = "./input_files/info_1opd/boinc_vf_aa1opd_09_05.200_v1_3";
+    opd.ss_file = "./input_files/info_1opd/vf_1opd_.psipred_ss2";
+  
+! 
+!  Protinfo new_opd;
+!   new_opd.name = "new_1opd";
+!   new_opd.pdb_file = "./input_files/new_info_1opd/vf_1opd.pdb";
+!   new_opd.map_file = "./emd_6272.map";
+!   new_opd.frag_3 = "./input_files/new_info_1opd/boinc_vf_aa1opd_03_05.200_v1_3";
+!   new_opd.frag_9 = "./input_files/new_info_1opd/boinc_vf_aa1opd_09_05.200_v1_3";
+!   new_opd.ss_file = "./input_files/new_info_1opd/vf_1opd_.psipred_ss2";
+! 
+! 
+!     Protinfo rnbA;
+    rnbA.name = "1rnbA";
+    rnbA.pdb_file = "./input_files/info_1rnbA/vf_1rnb.pdb";
+    rnbA.map_file = "./emd_6272.map";
+***************
+*** 306,318 ****
+    hz6A.frag_9 = "./input_files/1hz6A_oldfrags_inputs/boinc_vf_aa1hz6A09_05.200_v1_3";
+    hz6A.ss_file = "./input_files/1hz6A_oldfrags_inputs/vf_1hz6A.psipred_ss2";
+  
+    Protinfo npsA;
+    npsA.name = "1npsA";
+!   npsA.pdb_file = "./input_files/1npsA_oldfrags_inputs/vf_1npbs.pdb";
+    npsA.map_file = "./emd_6272.map";
+!   npsA.frag_3 = "./input_files/1npsA_oldfrags_inputs/boinc_vf_aa1npsA03_05.200_v1_3";
+!   npsA.frag_9 = "./input_files/1npsA_oldfrags_inputs/boinc_vf_aa1npsA09_05.200_v1_3";
+!   npsA.ss_file = "./input_files/1npsA_oldfrags_inputs/vf_1npsA.psipred_ss2";
+  
+    Protinfo tig;
+    tig.name = "1tig";
+--- 306,319 ----
+    hz6A.frag_9 = "./input_files/1hz6A_oldfrags_inputs/boinc_vf_aa1hz6A09_05.200_v1_3";
+    hz6A.ss_file = "./input_files/1hz6A_oldfrags_inputs/vf_1hz6A.psipred_ss2";
+  
++ 
+    Protinfo npsA;
+    npsA.name = "1npsA";
+!   npsA.pdb_file = "./input_files/info_1npsA/vf_1nps.pdb";
+    npsA.map_file = "./emd_6272.map";
+!   npsA.frag_3 = "./input_files/info_1npsA/boinc_vf_aa1npsA03_05.200_v1_3";
+!   npsA.frag_9 = "./input_files/info_1npsA/boinc_vf_aa1npsA09_05.200_v1_3";
+!   npsA.ss_file = "./input_files/info_1npsA/vf_1npsA.psipred_ss2";
+  
+    Protinfo tig;
+    tig.name = "1tig";
+***************
+*** 336,343 ****
+    chf.frag_3 = "./input_files/info_2chf/boinc_vf_aa2chf_03_05.200_v1_3";
+    chf.frag_9 = "./input_files/info_2chf/boinc_vf_aa2chf_09_05.200_v1_3";
+    chf.ss_file = "./input_files/info_2chf/vf_2chf_.psipred_ss2";
+  
+!   Protinfo acf;
+    acf.name = "1acf";
+    acf.pdb_file = "./input_files/info_1acf/vf_1acf.pdb";
+    acf.map_file = "./emd_6272.map";
+--- 337,352 ----
+    chf.frag_3 = "./input_files/info_2chf/boinc_vf_aa2chf_03_05.200_v1_3";
+    chf.frag_9 = "./input_files/info_2chf/boinc_vf_aa2chf_09_05.200_v1_3";
+    chf.ss_file = "./input_files/info_2chf/vf_2chf_.psipred_ss2";
++   Protinfo gvp;
++   gvp.name = "1gvp";
++   gvp.pdb_file = "./input_files/info_1gvp/vf_1gvp.pdb";
++   gvp.map_file = "./emd_6272.map";
++   gvp.frag_3 = "./input_files/info_1gvp/boinc_vf_aa1gvp_03_05.200_v1_3";
++   gvp.frag_9 = "./input_files/info_1gvp/boinc_vf_aa1gvp_09_05.200_v1_3";
++   gvp.ss_file = "./input_files/info_1gvp/vf_1gvp_.psipred_ss2";
++ 
+  
+!  Protinfo acf;
+    acf.name = "1acf";
+    acf.pdb_file = "./input_files/info_1acf/vf_1acf.pdb";
+    acf.map_file = "./emd_6272.map";
+***************
+*** 367,394 ****
+    bk2.ss_file = "./input_files/info_1bk2/vf_1bk2_.psipred_ss2";
+    Protinfo a19;
+    a19.name = "1a19A";
+!   a19.pdb_file = "./input_files/info_1a19/vf_1a19.pdb";
+    a19.map_file = "./emd_6272.map";
+!   a19.frag_3 = "./input_files/info_1a19/boinc_vf_aa1a19A03_05.200_v1_3";
+!   a19.frag_9 = "./input_files/info_1a19/boinc_vf_aa1a19A09_05.200_v1_3";
+!   a19.ss_file = "./input_files/info_1a19/vf_1a19A.psipred_ss2";
+    Protinfo b3a;
+    b3a.name = "1b3aA";
+!   b3a.pdb_file = "./input_files/info_1b3a/vf_1b3a.pdb";
+    b3a.map_file = "./emd_6272.map";
+!   b3a.frag_3 = "./input_files/info_1b3a/boinc_vf_aa1b3aA03_05.200_v1_3";
+!   b3a.frag_9 = "./input_files/info_1b3a/boinc_vf_aa1b3aA09_05.200_v1_3";
+!   b3a.ss_file = "./input_files/info_1b3a/vf_1b3aA.psipred_ss2";
+    Protinfo bkr;
+    bkr.name = "1bkrA";
+!   bkr.pdb_file = "./input_files/info_1bkr/vf_1bkr.pdb";
+    bkr.map_file = "./emd_6272.map";
+!   bkr.frag_3 = "./input_files/info_1bkr/boinc_vf_aa1bkrA03_05.200_v1_3";
+!   bkr.frag_9 = "./input_files/info_1bkr/boinc_vf_aa1bkrA09_05.200_v1_3";
+!   bkr.ss_file = "./input_files/info_1bkr/vf_1bkrA.psipred_ss2";
+  
+  
+!   // 5 set of proteins
+    Protinfo cg5;
+    cg5.name = "1cg5B";
+    cg5.pdb_file = "./input_files/info_1cg5B/vf_1cg5.pdb";
+--- 376,416 ----
+    bk2.ss_file = "./input_files/info_1bk2/vf_1bk2_.psipred_ss2";
+    Protinfo a19;
+    a19.name = "1a19A";
+!   a19.pdb_file = "./input_files/info_1a19A/vf_1a19.pdb";
+    a19.map_file = "./emd_6272.map";
+!   a19.frag_3 = "./input_files/info_1a19A/boinc_vf_aa1a19A03_05.200_v1_3";
+!   a19.frag_9 = "./input_files/info_1a19A/boinc_vf_aa1a19A09_05.200_v1_3";
+!   a19.ss_file = "./input_files/info_1a19A/vf_1a19A.psipred_ss2";
+! 
+!   Protinfo eyvA;
+!   eyvA.name = "1eyvA";
+!   eyvA.pdb_file = "./input_files/info_1eyvA/vf_1eyv.pdb";
+!   eyvA.map_file = "./emd_6272.map";
+!   eyvA.frag_3 = "./input_files/info_1eyvA/boinc_vf_aa1eyvA03_05.200_v1_3";
+!   eyvA.frag_9 = "./input_files/info_1eyvA/boinc_vf_aa1eyvA09_05.200_v1_3";
+!   eyvA.ss_file = "./input_files/info_1eyvA/vf_1eyvA.psipred_ss2";
+! 
+! 
+    Protinfo b3a;
+    b3a.name = "1b3aA";
+!   b3a.pdb_file = "./input_files/info_1b3aA/vf_1b3a.pdb";
+    b3a.map_file = "./emd_6272.map";
+!   b3a.frag_3 = "./input_files/info_1b3aA/boinc_vf_aa1b3aA03_05.200_v1_3";
+!   b3a.frag_9 = "./input_files/info_1b3aA/boinc_vf_aa1b3aA09_05.200_v1_3";
+!   b3a.ss_file = "./input_files/info_1b3aA/vf_1b3aA.psipred_ss2";
+    Protinfo bkr;
++ 
+    bkr.name = "1bkrA";
+!   bkr.pdb_file = "./input_files/info_1bkrA/vf_1bkr.pdb";
+    bkr.map_file = "./emd_6272.map";
+!   bkr.frag_3 = "./input_files/info_1bkrA/boinc_vf_aa1bkrA03_05.200_v1_3";
+!   bkr.frag_9 = "./input_files/info_1bkrA/boinc_vf_aa1bkrA09_05.200_v1_3";
+!   bkr.ss_file = "./input_files/info_1bkrA/vf_1bkrA.psipred_ss2";
+  
+  
+! 
+! 
+!     // 5 set of proteins
+    Protinfo cg5;
+    cg5.name = "1cg5B";
+    cg5.pdb_file = "./input_files/info_1cg5B/vf_1cg5.pdb";
+***************
+*** 480,485 ****
+--- 502,509 ----
+    prot_selection["2vik"] = vik;
+    prot_selection["2ci2I"] = ci2;
+  
++ 
++ 
+    prot_selection["1acf"] = acf;
+    prot_selection["1bk2"] = bk2;
+    prot_selection["1a19A"] = a19;
+***************
+*** 489,505 ****
+    prot_selection["1bkrA"] = bkr;
+  
+  
+    prot_selection["1c8cA"] = c8c;
+    prot_selection["1c9oA"] = c9o;
+    prot_selection["1elwA"] = elw;
+    prot_selection["1opd"] = opd;
+    prot_selection["1rnbA"] = rnbA;
+    prot_selection["1fna"] = fna;
+    prot_selection["1who"] = who;
+    prot_selection["1kpeA"] = kpeA;
+!   prot_selection["1chf"] = chf;
+!   prot_selection["1ten"] = ten;
+!   prot_selection["256bA"] = bA;
+  
+    // proteinas viejas
+    prot_selection["1dtdB"] = dtdB;
+--- 513,531 ----
+    prot_selection["1bkrA"] = bkr;
+  
+  
++ 
+    prot_selection["1c8cA"] = c8c;
+    prot_selection["1c9oA"] = c9o;
+    prot_selection["1elwA"] = elw;
+    prot_selection["1opd"] = opd;
++   prot_selection["new_1opd"] = new_opd;
++   prot_selection["1ten"] = ten;
++   prot_selection["256bA"] = bA;
+    prot_selection["1rnbA"] = rnbA;
+    prot_selection["1fna"] = fna;
+    prot_selection["1who"] = who;
+    prot_selection["1kpeA"] = kpeA;
+!   prot_selection["1bgf"] = bgf;
+  
+    // proteinas viejas
+    prot_selection["1dtdB"] = dtdB;
+***************
+*** 509,519 ****
+--- 535,555 ----
+    prot_selection["1ail_nueva"] = ail_nueva;
+    prot_selection["1hz6A"] = hz6A;
+  
++ 
++   // mas nuevas
+    prot_selection["1npsA"] = npsA;
+    prot_selection["1tig"] = tig;
+    prot_selection["1tit"] = tit;
+    prot_selection["2chf"] = chf;
+  
++   prot_selection["1npsA"] = npsA;
++   prot_selection["1tig"] = tig;
++   prot_selection["1tit"] = tit;
++   prot_selection["1gvp"] = gvp;
++   prot_selection["1eyvA"] = eyvA;
++   prot_selection["2chf"] = chf;
++ 
++ 
+  }
+  
+  void
+***************
+*** 647,654 ****
+     if ( (app_options.get<std::string>("Protocol.name") =="HybridShared") ||
+  	(app_options.get<std::string>("Protocol.name") =="MPIResetOldCrowdingDE") ||
+  	(app_options.get<std::string>("Protocol.name") =="HybridMover") ||
+- 	(app_options.get<std::string>("Protocol.name") =="MPICrowdingDE") ||
+  	(app_options.get<std::string>("Protocol.name") =="MPISeedsDE") ||
+  	(app_options.get<std::string>("Protocol.name") =="ResetOld") ||
+  	(app_options.get<std::string>("Protocol.name") =="ResetOldCDE") ||
+  	(app_options.get<std::string>("Protocol.name") =="HybridCrowdingDE")) {
+--- 683,690 ----
+     if ( (app_options.get<std::string>("Protocol.name") =="HybridShared") ||
+  	(app_options.get<std::string>("Protocol.name") =="MPIResetOldCrowdingDE") ||
+  	(app_options.get<std::string>("Protocol.name") =="HybridMover") ||
+  	(app_options.get<std::string>("Protocol.name") =="MPISeedsDE") ||
++ 	(app_options.get<std::string>("Protocol.name") =="MPICrowdingDE") ||
+  	(app_options.get<std::string>("Protocol.name") =="ResetOld") ||
+  	(app_options.get<std::string>("Protocol.name") =="ResetOldCDE") ||
+  	(app_options.get<std::string>("Protocol.name") =="HybridCrowdingDE")) {
+***************
+*** 803,809 ****
+      std::vector<double> current_rmsd = result.rmsd_to_native;
+      // rescore population
+      for (int i = 0; i < current_population.size(); i++) {
+!       ffxn->score(current_population[i]);
+      }
+    }
+  }
+--- 839,845 ----
+      std::vector<double> current_rmsd = result.rmsd_to_native;
+      // rescore population
+      for (int i = 0; i < current_population.size(); i++) {
+!       simple_ffxn->score(current_population[i]);
+      }
+    }
+  }
+***************
+*** 938,957 ****
+  }
+  
+  void DE_Operator::print_final_population(std::vector<Individual> popul ) {
+!   CalculateDistancePopulation::DistancesResult result =
+!     calculate_distances_popul->run(popul);
+!   std::vector<double> current_rmsd = result.rmsd_to_native;
+!   std::cout << "[POP] ";
+    double acc = 0;
+    double best = 100000;
+    for (int i = 0; i < app_options.get<int>("DE.NP"); i++) {
+!     double score = popul[i].score;
+      acc += score;
+!     if (popul[i].score < best) {
+!       best = popul[i].score;
+      }
+    }
+    std::cout << "[GEN] 99999 " << best << " " << acc/popul.size() << std::endl;
+     for (int i = 0; i < app_options.get<int>("DE.NP"); i++) {
+      double score = popul[i].score;
+      std::cout << (-1 * SCORE_ERROR_FIXED) +  score << " , ";
+--- 974,994 ----
+  }
+  
+  void DE_Operator::print_final_population(std::vector<Individual> popul ) {
+!   std::vector<double> current_rmsd  =
+!     calculate_distances_popul->run_rmsd_to_native(popul);
+!   //std::vector<double> current_rmsd = result.rmsd_to_native;
+! 
+    double acc = 0;
+    double best = 100000;
+    for (int i = 0; i < app_options.get<int>("DE.NP"); i++) {
+!     double score =  (-1 * SCORE_ERROR_FIXED) +  popul[i].score;
+      acc += score;
+!     if (score < best) {
+!       best = score;
+      }
+    }
+    std::cout << "[GEN] 99999 " << best << " " << acc/popul.size() << std::endl;
++   std::cout << "[POP] ";
+     for (int i = 0; i < app_options.get<int>("DE.NP"); i++) {
+      double score = popul[i].score;
+      std::cout << (-1 * SCORE_ERROR_FIXED) +  score << " , ";
+***************
+*** 966,971 ****
+--- 1003,1009 ----
+    std::cout << std::endl;
+  }
+  
++ 
+  void
+  DE_Operator::run() {
+    std::string stage_name;
+***************
+*** 976,983 ****
+  
+  
+    if (false) {
+!     initialize_population_stage1();
+!     run_complete_abinitio();
+    } else {
+      initialize_population_stage1();
+      PrintRMSDvsMarioAnalisys printer_mario_pairs(  use_distances_strategy("rmsd"),  use_distances_strategy("euclidean_partial_mario"));
+--- 1014,1021 ----
+  
+  
+    if (false) {
+! 	initialize_population_stage1();
+! 	run_complete_abinitio();
+    } else {
+      initialize_population_stage1();
+      PrintRMSDvsMarioAnalisys printer_mario_pairs(  use_distances_strategy("rmsd"),  use_distances_strategy("euclidean_partial_mario"));
+***************
+*** 985,990 ****
+--- 1023,1029 ----
+      printer_mario_pairs.apply(current_population);
+      std::cout << "================================================" << std::endl;
+  
++ 
+      if ( std::find(vec_stages.begin(), vec_stages.end(), "stage2") != vec_stages.end()) {
+        stage_name = "stage2";
+        std::cout << "================================================" << std::endl;
+***************
+*** 1007,1018 ****
+        apply_differential_evolution_with_stage(stage_name);
+      }
+  
+- 
+- 
+      std::cout << "================================================" << std::endl;
+      printer_mario_pairs.apply(current_population);
+      std::cout << "================================================" << std::endl;
+      //print_best_pose();
+      print_final_population(current_population);
+    }
+  }
+--- 1046,1056 ----
+        apply_differential_evolution_with_stage(stage_name);
+      }
+  
+      std::cout << "================================================" << std::endl;
+      printer_mario_pairs.apply(current_population);
+      std::cout << "================================================" << std::endl;
+      //print_best_pose();
+      print_final_population(current_population);
++ 
+    }
+  }
