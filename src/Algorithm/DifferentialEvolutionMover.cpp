@@ -411,7 +411,7 @@ bool MoverDE::select_population(const std::vector<Individual>& trial_popul) {
 
 bool CrowdingHybridMoverDE::select_population(const std::vector<Individual>& trial_popul) {
 
-  return MoverDE::select_population(trial_popul);
+  // return MoverDE::select_population(trial_popul);
   //  SharedHybridMoverDE::select_population(trial_popul);
 
 
@@ -425,7 +425,7 @@ bool CrowdingHybridMoverDE::select_population(const std::vector<Individual>& tri
   for (int i = 0; i < trial_popul.size(); i++) {
     int target_ind = 0;
 
-    if (true) {
+    if (fit_rad < 0) {
       target_ind = i;
     } else {
       target_ind = calculate_distances_popul->find_nearest(trial_popul[i], popul);
@@ -444,6 +444,7 @@ bool CrowdingHybridMoverDE::select_population(const std::vector<Individual>& tri
   avg_acc = 0;
   best_idx = 0;
   best = popul[0].score;
+  // take statistics
   //  std::cout << "check_popul ";
   for (int i = 0; i < popul.size(); i++) {
     //std::cout << (-1 * SCORE_ERROR_FIXED) + popul[i].score << " ( "<< popul[i].score << " ) ";
@@ -1754,30 +1755,13 @@ void MPIfastCrowdingMoverDE::apply() {
 
     timestamp_t t0 = get_timestamp();
 
-    bool test_gecco2015_only_score_individuals = false;
     std::vector<IndMPI> result_from_mpi;
-    if (test_gecco2015_only_score_individuals) {
-      result_from_mpi = mpi_calculator->run(popul, trial_popul, 1);
-    } else {
-      result_from_mpi = mpi_calculator->run(popul, trial_popul, 2);
-    }
+    result_from_mpi = mpi_calculator->run(popul, trial_popul, 2);
     nearest_inds.resize(NP);
     for (int k= 0; k< result_from_mpi.size(); k++) {
       trial_popul[k] = result_from_mpi[k].ind;
       nearest_inds[k] = result_from_mpi[k].nearest;
     }
-
-    std::vector<int> check_nearest;
-    for (int k = 0; k < trial_popul.size(); k++) {
-	int target_ind = calculate_distances_popul->find_nearest(trial_popul[k], popul);
-	check_nearest.push_back(target_ind);
-    }
-
-    //  for (int k = 0; k < trial_popul.size(); k++) {
-    //    if (check_nearest[k] != nearest_inds[k]) {
-    // 	 std::cout << "DIFFERENT NEAREST " << k << " : " << check_nearest[k] << " != " << nearest_inds[k] << std::endl;
-    //    }
-    // }
 
     timestamp_t t1 = get_timestamp();
     double secs = (t1 - t0) / 1000000.0L;

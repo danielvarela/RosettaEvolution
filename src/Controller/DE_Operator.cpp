@@ -181,8 +181,8 @@ DE_Operator::apply_differential_evolution_with_stage(std::string stage_name) {
   de = prepare_stage(stage_name);
   de->apply();
   current_population = de->popul;
-  //best_pose_ = pose_->clone();
-  //ffxn->fill_pose(best_pose_, de->best_ind(), ss);
+  best_pose_ = pose_->clone();
+  ffxn->fill_pose(best_pose_, de->best_ind(), ss);
   std::cout << "BEST POSE FOUND AT STAGE " << stage_name << " " << de->best_ind().score << std::endl;
   std::cout << "finish apply " << stage_name << std::endl;
 

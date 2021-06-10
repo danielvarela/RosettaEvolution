@@ -228,9 +228,10 @@ CalculateDistancePopulation::find_nearest(Individual target, const std::vector<I
   pfunc->fill_pose(pose_target, target, ss);
 
    std::vector<int> crowding_list;
-  int crowding_size = fit_radius;
-    double best_found = 100000;
- int nearest_idx = 0;
+   //int crowding_size = fit_radius;
+  int crowding_size = popul_size;
+  double best_found = 100000;
+  int nearest_idx = 0;
   if (crowding_size == popul_size) {
 
     for (int i = 0; i < popul_size; i++) {
