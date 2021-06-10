@@ -1743,6 +1743,9 @@ void MPIfastCrowdingMoverDE::apply() {
     global_max_rmsd = -100000;
     global_avg_rmsd = 0;
     calculate_distances_popul->build_pdb_population(popul,popul_pdb);
+    if ((gen_count % 10) == 0) {
+	apply_local_search_at_population();
+    }
     timestamp_t t_sample = get_timestamp();
     for (int i = 0; i < NP; ++i) {
       select_parents(i, parents);
