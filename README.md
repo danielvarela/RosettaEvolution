@@ -25,7 +25,7 @@ Then
 ```
 cd $RosettaEvolution/build
 cmake ..
-build mpi_app
+make mpi_app
 ```
 
 
