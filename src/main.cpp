@@ -101,7 +101,7 @@ main(int argc, char** argv) {
   } else {
     boost::shared_ptr<DE_Operator> app_operator = run_operator(argc, argv);
     //WorkerProcess(app_operator).run();
-    //WorkerProcessScatterGather(app_operator).run();
-    WorkerProcessEvaluateAndNearest(app_operator).run();
+    WorkerProcessScatterGather(app_operator).run();
+    //WorkerProcessEvaluateAndNearest(app_operator).run();
   }
 }

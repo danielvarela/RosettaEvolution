@@ -58,7 +58,7 @@ WorkerProcess::ScoreStrategy::apply(Individual& ind) {
     
     ind.score = score;
   } else {
-    if (mode == 2) {
+    if (mode > 1) {
       double score = 0;
 #if(USE_CRYO_EM)
       score = scfxn_density->score(ind);
@@ -234,7 +234,13 @@ WorkerProcessEvaluateAndNearest::run() {
       // score
       score_ind.apply(ind_received.ind);
       // nearest
-      int nearest_ind = calculate_distances_popul->find_nearest(ind_received.ind, right_popul );
+      int nearest_ind = 0;
+      if (mode == 2) {
+	  nearest_ind = calculate_distances_popul->find_nearest(ind_received.ind, right_popul );
+      } else{
+	nearest_ind = 0;
+      }
+
       ind_received.nearest = nearest_ind;
       // send back the information as a IndMPI (including nearest index for each ind)
       world.send(0, 0, ind_received );

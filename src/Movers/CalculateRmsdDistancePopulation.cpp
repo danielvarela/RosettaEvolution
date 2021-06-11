@@ -219,6 +219,11 @@ double  CalculateDistancePopulation::distance_of_individual(core::pose::PoseOP p
 
 int
 CalculateDistancePopulation::find_nearest(Individual target, const std::vector<Individual>& popul, int target_index, std::vector<core::pose::PoseOP> popul_pdb) {
+  if (fit_radius== -1) {
+    return target_index;
+  }
+
+
   if (popul_pdb.size() == 0) {
     build_pdb_population(popul, popul_pdb);
   }
@@ -227,44 +232,50 @@ CalculateDistancePopulation::find_nearest(Individual target, const std::vector<I
   core::pose::PoseOP pose_target = pose_ind->clone();
   pfunc->fill_pose(pose_target, target, ss);
 
-   std::vector<int> crowding_list;
-   //int crowding_size = fit_radius;
-  int crowding_size = popul_size;
+  std::vector<int> crowding_list;
+  int crowding_size = fit_radius;
+  //int crowding_size = popul_size;
   double best_found = 100000;
+
+  //std::cout << "popul size " << popul_size << " fit rad " << fit_radius << std::endl;
   int nearest_idx = 0;
-  if (crowding_size == popul_size) {
+  if (crowding_size == -1) {
+    nearest_idx = target_index;
+  }
+  else{
+    if (crowding_size == popul_size) {
+      for (int i = 0; i < popul_size; i++) {
+	double curr_dist = current_distance_calculation(*popul_pdb[i], *pose_target);
 
-    for (int i = 0; i < popul_size; i++) {
-      double curr_dist = current_distance_calculation(*popul_pdb[i], *pose_target);
-
-      if ((i != target_index) && (curr_dist != 0)) {
-        if (curr_dist < best_found) {
-          best_found = curr_dist;
-          nearest_idx = i;
-        }
+	if ((i != target_index) && (curr_dist != 0)) {
+	  if (curr_dist < best_found) {
+	    best_found = curr_dist;
+	    nearest_idx = i;
+	  }
+	}
+      }
+    } else {
+      while (crowding_list.size() < crowding_size) {
+	int candidate = rand() % popul_size;
+	if (candidate != target_index) {
+	  if (std::find(crowding_list.begin(), crowding_list.end(), candidate ) ==
+	      crowding_list.end() ) {
+	    crowding_list.push_back(candidate);
+	  }
+	}
+      }
+      for (int i = 0; i < crowding_size; i++) {
+	double curr_dist = current_distance_calculation(*popul_pdb[crowding_list[i]], *pose_target);
+	if (curr_dist < best_found) {
+	  best_found = curr_dist;
+	  //nearest_idx = i;
+	  nearest_idx = crowding_list[i];
+	}
       }
     }
+  }
   
-  } else {
-    while (crowding_list.size() < crowding_size) {
-      int candidate = rand() % popul_size;
-      if (candidate != target_index) {
-        if (std::find(crowding_list.begin(), crowding_list.end(), candidate ) ==
-            crowding_list.end() ) {
-          crowding_list.push_back(candidate);
-        }
-      }
-    }
-    for (int i = 0; i < crowding_size; i++) {
-      double curr_dist = current_distance_calculation(*popul_pdb[crowding_list[i]], *pose_target);
-      if (curr_dist < best_found) {
-        best_found = curr_dist;
-        nearest_idx = i;
-      }
-    }
-  } 
-  
- return nearest_idx;
+  return nearest_idx;
 }
 
 std::vector<int>
@@ -852,6 +863,12 @@ CalculateEuclideanMarioPartialDistancePopulation::find_top_nearest(Individual ta
 
 int
 CalculateEuclideanMarioPartialDistancePopulation::find_nearest(Individual target, const std::vector<Individual>& popul, int target_index, std::vector<core::pose::PoseOP> popul_pdb) {
+  int crowding_size = fit_radius;
+
+  if (crowding_size == -1) {
+    return target_index;
+  }
+
   if (popul_pdb.size() == 0) {
     build_pdb_population(popul, popul_pdb);
     build_inter_distances_of_population(popul);
@@ -869,40 +886,45 @@ CalculateEuclideanMarioPartialDistancePopulation::find_nearest(Individual target
   inter_distance_individual_1 = inter_distance_target;
   // std::cout << "find_nearest " << std::endl;
   std::vector<int> crowding_list;
-  int crowding_size = fit_radius;
- 
-  if (crowding_size == popul_size) {
-  for (int i = 0; i < popul_size; i++) {
-      inter_distance_individual_2 = inter_distances_per_ind[i];
-      double curr_dist = current_distance_calculation(*popul_pdb[i], *pose_target);
-      if ((i != target_index) && (curr_dist != 0)) {
-        // std::cout << i << " : " << curr_dist << std::endl;
-        if (curr_dist < best_found) {
-          best_found = curr_dist;
-          nearest_idx = i;
-        }
+
+  if (crowding_size == -1) {
+    nearest_idx = target_index;
+  }
+  else{
+    if (crowding_size == popul_size) {
+      for (int i = 0; i < popul_size; i++) {
+	inter_distance_individual_2 = inter_distances_per_ind[i];
+	double curr_dist = current_distance_calculation(*popul_pdb[i], *pose_target);
+	if ((i != target_index) && (curr_dist != 0)) {
+	  // std::cout << i << " : " << curr_dist << std::endl;
+	  if (curr_dist < best_found) {
+	    best_found = curr_dist;
+	    nearest_idx = i;
+	  }
+	}
       }
-    }
-  } else {
-    while (crowding_list.size() < crowding_size) {
-      int candidate = rand() % popul_size;
-      if (candidate != target_index) {
-	if (std::find(crowding_list.begin(), crowding_list.end(), candidate ) ==
-	    crowding_list.end() ) {
-	  crowding_list.push_back(candidate);
+    } else {
+      while (crowding_list.size() < crowding_size) {
+	int candidate = rand() % popul_size;
+	if (candidate != target_index) {
+	  if (std::find(crowding_list.begin(), crowding_list.end(), candidate ) ==
+	      crowding_list.end() ) {
+	    crowding_list.push_back(candidate);
+	  }
+	}
+      }
+ 
+      for (int i = 0; i < crowding_list.size(); i++) {
+	inter_distance_individual_2 = inter_distances_per_ind[crowding_list[i]];
+	double curr_dist = current_distance_calculation(*popul_pdb[crowding_list[i]], *pose_target);
+	// std::cout << i << " : " << curr_dist << std::endl;
+	if (curr_dist < best_found) {
+	  best_found = curr_dist;
+	  nearest_idx = crowding_list[i];
 	}
       }
     }
- 
-    for (int i = 0; i < crowding_list.size(); i++) {
-      inter_distance_individual_2 = inter_distances_per_ind[crowding_list[i]];
-      double curr_dist = current_distance_calculation(*popul_pdb[crowding_list[i]], *pose_target);
-      // std::cout << i << " : " << curr_dist << std::endl;
-      if (curr_dist < best_found) {
-	best_found = curr_dist;
-	nearest_idx = crowding_list[i];
-      }
-    }
+
   }
 
   // std::cout<< "found at " << nearest_idx << " dist " << best_found << std::endl;

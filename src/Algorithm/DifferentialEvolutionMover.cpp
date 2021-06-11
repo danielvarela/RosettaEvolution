@@ -1732,8 +1732,8 @@ void MPIfastCrowdingMoverDE::apply() {
   std::vector<Individual> trial_popul;
   double global_min_rmsd, global_max_rmsd, global_avg_rmsd;
   bool equal_value = false;
-  //mpi_calculator = boost::shared_ptr<MasterRosettaCalculator>(new  MasterScatterGather(scfxn, calculate_distances_popul));
-  mpi_calculator = boost::shared_ptr<MasterRosettaCalculator>(new MasterEvaluateAndNearestCalculator(scfxn, calculate_distances_popul));
+  mpi_calculator = boost::shared_ptr<MasterRosettaCalculator>(new  MasterScatterGather(scfxn, calculate_distances_popul));
+  //mpi_calculator = boost::shared_ptr<MasterRosettaCalculator>(new MasterEvaluateAndNearestCalculator(scfxn, calculate_distances_popul));
 
   while (gen_count < Gmax && !equal_value) {
     timestamp_t t_ini = get_timestamp();
@@ -1743,9 +1743,17 @@ void MPIfastCrowdingMoverDE::apply() {
     global_max_rmsd = -100000;
     global_avg_rmsd = 0;
     calculate_distances_popul->build_pdb_population(popul,popul_pdb);
-    if ((gen_count % 10) == 0) {
-	apply_local_search_at_population();
-    }
+    // if ((gen_count % 10) == 0) {
+    //   std::vector<IndMPI> result_from_mpi;
+    //   result_from_mpi = mpi_calculator->run(popul, popul, 3);
+    //   nearest_inds.resize(NP);
+    //   for (int k= 0; k< result_from_mpi.size(); k++) {
+    // 	popul[k] = result_from_mpi[k].ind;
+    //   }
+    //   calculate_distances_popul->build_pdb_population(popul,popul_pdb);
+    // } else{
+    //   calculate_distances_popul->build_pdb_population(popul,popul_pdb);
+    // }
     timestamp_t t_sample = get_timestamp();
     for (int i = 0; i < NP; ++i) {
       select_parents(i, parents);
@@ -1822,8 +1830,11 @@ bool MPIfastCrowdingMoverDE::select_population(const std::vector<Individual>& tr
   std::cout << "[calculated_nearest] ";
   for (int i = 0; i < trial_popul.size(); i++) {
     int target_ind = 0;
-    //target_ind = calculate_distances_popul->find_nearest(trial_popul[i], popul);
-    target_ind = nearest_inds[i];
+    if (fit_rad < 0) {
+      target_ind = i;
+    } else {
+      target_ind = nearest_inds[i];
+    }
     std::cout << target_ind << " ";
     if ( trial_popul[i].score < popul[target_ind].score ) {
       popul[target_ind] = trial_popul[i];
