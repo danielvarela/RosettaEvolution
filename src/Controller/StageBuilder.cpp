@@ -99,7 +99,7 @@ StageBuilder::prepare_DE_for_stage(std::string stage_name, std::vector<Individua
   ffxn->name_ = std::string("Score Function for stage " + stage_name);
   print_best = initializer_print_best();
   initializer_distances_calculator();
-  //update_current_population_to_stage_score(current_population);
+  update_current_population_to_stage_score(current_population);
   boost::shared_ptr<MoverDE> de = AlgorithmBuilder(app_options, ffxn,  current_population,   local_search, frag_opt).build();
   de->Gmax = gmax_per_stage[stage_name];
   de->use_print_class = true;

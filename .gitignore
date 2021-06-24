@@ -38,3 +38,6 @@ input*
 core*
 error*out
 nmpi*out
+
+*.txt
+*.png
