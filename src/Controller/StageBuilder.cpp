@@ -64,7 +64,9 @@ StageBuilder::update_current_population_to_stage_score( std::vector<Individual>&
 #if(MPI_ENABLED)
   
     ffxn = OptionsMapInitializer::FitnessFunctionInitializer(frag_opt, frag_mover, true).set_up();
-  mpi_calculator = boost::shared_ptr<MasterRosettaCalculator>(new MasterRosettaCalculator(ffxn));
+    //mpi_calculator = boost::shared_ptr<MasterRosettaCalculator>(new MasterRosettaCalculator(ffxn));
+    mpi_calculator = boost::shared_ptr<MasterRosettaCalculator>(new MasterScatterGather(ffxn, calculate_distances_popul));
+
   mpi_calculator->stage_name = ffxn->name();
 #else
     ffxn = OptionsMapInitializer::FitnessFunctionInitializer(frag_opt, frag_mover, false).set_up();
@@ -99,7 +101,7 @@ StageBuilder::prepare_DE_for_stage(std::string stage_name, std::vector<Individua
   ffxn->name_ = std::string("Score Function for stage " + stage_name);
   print_best = initializer_print_best();
   initializer_distances_calculator();
-  update_current_population_to_stage_score(current_population);
+  //update_current_population_to_stage_score(current_population);
   boost::shared_ptr<MoverDE> de = AlgorithmBuilder(app_options, ffxn,  current_population,   local_search, frag_opt).build();
   de->Gmax = gmax_per_stage[stage_name];
   de->use_print_class = true;

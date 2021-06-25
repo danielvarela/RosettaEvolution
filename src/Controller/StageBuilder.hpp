@@ -11,6 +11,7 @@
 #include "AlgorithmBuilder.hpp"
 #include "FragmentInserterBuilder.hpp"
 
+
 class StageBuilder
 {
 public:

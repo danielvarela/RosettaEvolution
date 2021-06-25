@@ -1735,6 +1735,7 @@ void MPIfastCrowdingMoverDE::apply() {
   mpi_calculator = boost::shared_ptr<MasterRosettaCalculator>(new  MasterScatterGather(scfxn, calculate_distances_popul));
   //mpi_calculator = boost::shared_ptr<MasterRosettaCalculator>(new MasterEvaluateAndNearestCalculator(scfxn, calculate_distances_popul));
 
+  Gmax = 100;
   while (gen_count < Gmax && !equal_value) {
     timestamp_t t_ini = get_timestamp();
     reset_stat();
@@ -1743,17 +1744,14 @@ void MPIfastCrowdingMoverDE::apply() {
     global_max_rmsd = -100000;
     global_avg_rmsd = 0;
     calculate_distances_popul->build_pdb_population(popul,popul_pdb);
-    // if ((gen_count % 10) == 0) {
-    //   std::vector<IndMPI> result_from_mpi;
-    //   result_from_mpi = mpi_calculator->run(popul, popul, 3);
-    //   nearest_inds.resize(NP);
-    //   for (int k= 0; k< result_from_mpi.size(); k++) {
-    // 	popul[k] = result_from_mpi[k].ind;
-    //   }
-    //   calculate_distances_popul->build_pdb_population(popul,popul_pdb);
-    // } else{
-    //   calculate_distances_popul->build_pdb_population(popul,popul_pdb);
-    // }
+    if (gen_count == 0) {
+      std::vector<IndMPI> result_from_mpi;
+      result_from_mpi = mpi_calculator->run(popul, popul, 3);
+      nearest_inds.resize(NP);
+      for (int k= 0; k< result_from_mpi.size(); k++) {
+    	popul[k] = result_from_mpi[k].ind;
+      }
+    }
     timestamp_t t_sample = get_timestamp();
     for (int i = 0; i < NP; ++i) {
       select_parents(i, parents);
